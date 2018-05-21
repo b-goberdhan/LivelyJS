@@ -7,7 +7,7 @@ A flexible JavaScript animation library for simple to complex animations.
 * Can use custom easing functions.
 * Easy to install and use.
 
-## TBD:
+## To be added:
 * Animated Key frames
 * Specify easing functions per property affected (currently the same easing function affects all properties for a given target)
 
