@@ -1,73 +1,18 @@
-
-function filterTargetAnimationKey(key) {
-    return key !== 'target' && key !== 'update' && key !== 'ease' && key !== 'done';
-}
-
-function getPropKeys(targetAnimation = {}) {
-    var propKeys = [];
-    for (var animatableKey in targetAnimation) {
-        if (targetAnimation.hasOwnProperty(animatableKey) && filterTargetAnimationKey(animatableKey)) {
-            propKeys.push(animatableKey);
-        }
-    }
-    return propKeys;
-}
-
-function copy(obj) {
-    return JSON.parse(JSON.stringify(obj));
-}
-
-function setCssValue(property, value) {
-    if (property === 'opacity') {
-        return value;
-    }
-    else {
-        return value + 'px';
-    }
-}
-
-function getValueFromCSS(property, value) {
-    if (property === 'opacity') {
-        return parseFloat(value);
-    }
-    return parseInt(value, 10);
-}
-
-function animator(targetAnimationState, duration) {
+function animator(animation, duration) {
     var isPlaying,
-        DOMElements,
         animationFrame,
-        targetPropKeys,
-        initialPropVals,
+        targetPropertyKeys,
+        startProperties,
         startTime;
 
     var play = function() {
+        if (typeof animation.target === 'string') {
+            animation.target = document.querySelectorAll(animation.target);
+        }
+        targetPropertyKeys = getTargetPropKeys(animation);
+        startProperties = getStartingProperties(targetPropertyKeys, animation);
+        animationFrame = requestAnimationFrame(animate);
         isPlaying = true;
-        if (typeof targetAnimationState.target === 'string') {
-            DOMElements = document.querySelectorAll(targetAnimationState.target);
-        }
-        targetPropKeys = getPropKeys(targetAnimationState);
-        
-        initialPropVals = {};
-        targetPropKeys.forEach(function(key) {
-            if (DOMElements) {
-                DOMElements.forEach(function(element) {
-                    initialPropVals[key] = getValueFromCSS(key, element.style[key]);
-                });
-            }
-            else {
-                initialPropVals[key] = copy(targetAnimationState.target[key]);
-            }
-        });
-        if (targetPropKeys && targetAnimationState.target) {
-            if (!DOMElements) {
-                animationFrame = requestAnimationFrame(animate);
-            }
-            else {
-                animationFrame = requestAnimationFrame(animateDOMElements);
-            }
-            
-        }
         
     };
 
@@ -78,100 +23,199 @@ function animator(targetAnimationState, duration) {
         }
     };
 
-    var animateDOMElements = function(timeStamp) {
-        if (!startTime) {
-            startTime = timeStamp;
-        }
-        var currentTime = timeStamp - startTime;
-        targetPropKeys.forEach(function(key) {
-            DOMElements.forEach(function(element) {
-                var tweenedValue = animateProperty(currentTime, key, duration, targetAnimationState.ease);
-                element.style[key] = setCssValue(key, tweenedValue);
-            });      
-        });
-        var doneAnimation = (currentTime >= duration);
-        if (doneAnimation) {
-            stop();
-            if (targetAnimationState.update) {
-                var updatedProps = [];
-                targetPropKeys.forEach(function (key) {
-                    var obj = {};
-                    obj[key] = targetAnimationState.target[key];
-                    updatedProps.push(obj);
-                });
-                targetAnimationState.update(updatedProps);
-            }
-            if (targetAnimationState.done) {
-                targetAnimationState.done();
-            }
-        }
-        else {
-            requestAnimationFrame(animateDOMElements);
-        }
-
-    }
     var animate = function(timeStamp) {
         if (!startTime) {
             startTime = timeStamp;
         }
         var currentTime = timeStamp - startTime;
-        //var doneAnimation = false;
-        targetPropKeys.forEach(function(key) {
-            if (DOMElements) {
-                DOMElements.forEach(function(element) {
-                    var tweenedValue = animateProperty(currentTime, key, duration, targetAnimationState.ease);
-                    element.style[key] = tweenedValue;
+        if (isCollection(animation.target)) {
+            if (animation.target.constructor === Array) {
+                targetPropertyKeys.forEach(function (key) {
+                    for (var i = 0; i < animation.target.length; i++) {
+                        animation.target[i][key] = animateProperty(currentTime, key, duration, startProperties[i][key], animation.ease);
+                    }
+                });
+            }
+            else if (animation.target.constructor === NodeList) {
+                targetPropertyKeys.forEach(function (key) {
+                    for (var i = 0; i < animation.target.length; i++) {
+                        var startVal = getValueFromCSS(key, startProperties[i][key]);
+                        animation.target[i].style[key] = setCssValue(key, animateProperty(currentTime, key, duration, startVal, animation.ease));
+                    }
+                });
+            }
+
+        }
+        else {
+            if (animation.target.style) {
+                targetPropertyKeys.forEach(function (key) {
+                    var startVal = getValueFromCSS(key, startProperties[key]);
+                    animation.target.style[key] = setCssValue(key, animateProperty(currentTime, key, duration, startVal, animation.ease));
                 });
             }
             else {
-                targetAnimationState.target[key] = animateProperty(currentTime, key, duration, targetAnimationState.ease);
+                targetPropertyKeys.forEach(function(key) {
+                    animation.target[key] = animateProperty(currentTime, key, duration, startProperties[key], animation.ease);
+                });
             }
-        });
+
+
+        }
 
         var doneAnimation = (currentTime >= duration);
         if (doneAnimation) {
             stop();
-            if (targetAnimationState.update) {
+            if (animation.update) {
                 var updatedProps = [];
-                targetPropKeys.forEach(function (key) {
+                targetPropertyKeys.forEach(function (key) {
                     var obj = {};
-                    obj[key] = targetAnimationState.target[key];
+                    obj[key] = animation.target[key];
                     updatedProps.push(obj);
                 });
-                targetAnimationState.update(updatedProps);
+                animation.update(updatedProps);
             }
-            if (targetAnimationState.done) {
-                targetAnimationState.done();
+            if (animation.done) {
+                animation.done();
             }
         }
         else {
             requestAnimationFrame(animate);
         }
         
-    }
+    };
 
-    function animateProperty(currentTime, key, duration, ease) {
-        var startingPropVal = initialPropVals[key];
-        var desiredPropVal = targetAnimationState[key]
+
+
+    function animateProperty(currentTime, key, duration, startVal, ease) {
+        var startingPropVal = startVal;
+        var desiredPropVal = animation[key];
+        var changeInValue = desiredPropVal - startVal;
         var tweenedValue;
-        
+
         // If time is up, ensure the tween value is the final.
         if (currentTime >= duration) {
             tweenedValue = desiredPropVal;
         }
         else if (!ease) {
-            tweenedValue = linearTween(currentTime, startingPropVal, desiredPropVal, duration);
+            tweenedValue = linearTween(currentTime, startingPropVal, changeInValue, duration);
         }
         else {
-            tweenedValue = ease(currentTime, startingPropVal, desiredPropVal, duration);
+            tweenedValue = ease(currentTime, startingPropVal, changeInValue, duration);
         }
 
-        if (targetAnimationState.update) {
+        if (animation.update) {
             var obj = {};
             obj[key] = tweenedValue;
-            targetAnimationState.update([obj]);
+            animation.update([obj]);
         }
         return tweenedValue;
+    }
+    // helpers
+    function filterTargetAnimationKey(key) {
+        return key !== 'target' && key !== 'update' && key !== 'ease' && key !== 'done';
+    }
+    function getStartingProperties(targetKeys, animation) {
+        var startingProperties = {};
+        if (isCollection(animation.target)) {
+            if (animation.target.constructor === Array) {
+                targetKeys.forEach(function (key) {
+                    for (var i = 0; i < animation.target.length; i++) {
+                        startingProperties[i] = {};
+                        startingProperties[i][key] = animation.target[i][key];
+                    }
+                });
+            }
+            else if (animation.target.constructor === NodeList) {
+                targetKeys.forEach(function (key) {
+                    for (var i = 0; i < animation.target.length; i++) {
+                        startingProperties[i] = {};
+                        startingProperties[i][key] = animation.target[i].style[key];
+                    }
+                });
+            }
+
+
+        }
+        else if (animation.target.style) {
+            targetKeys.forEach(function (key) {
+                startingProperties[key] = animation.target.style[key];
+            });
+        }
+        else {
+            targetKeys.forEach(function (key) {
+                startProperties[key] = animation.target[key];
+            });
+        }
+        return startingProperties;
+
+    }
+    function getTargetPropKeys(animation) {
+        var propKeys = [];
+        function targetPropertiesFound(target, animatableKey) {
+            return target && target.hasOwnProperty(animatableKey) || (target.style && target.style.hasOwnProperty(animatableKey));
+        }
+        for (var animatableKey in animation) {
+            if (animation.hasOwnProperty(animatableKey) && filterTargetAnimationKey(animatableKey)) {
+                //now make sure the animation targets has this property
+                if (animation.target.constructor === Array || animation.target.constructor === NodeList) {
+                    //make sure all element have these
+                    var elementsHaveTargetedProps;
+                    if (animation.target.constructor === NodeList) {
+                        for (var i = 0; i < animation.target.length; i++) {
+                            if (!targetPropertiesFound(animation.target[i], animatableKey)) {
+                                elementsHaveTargetedProps = false;
+                                break;
+                            }
+                            else {
+                                elementsHaveTargetedProps = true;
+                            }
+                        }
+                    }
+                    else {
+                        elementsHaveTargetedProps = animation.target.every(function (target) {
+                            return targetPropertiesFound(target, animatableKey)
+                        });
+                    }
+
+                    if (elementsHaveTargetedProps) {
+                        propKeys.push(animatableKey);
+                    }
+                    else {
+                        delete animation[animatableKey];
+                    }
+                }
+                // if we only have one target
+                else if (targetPropertiesFound(animation.target, animatableKey)) {
+                    propKeys.push(animatableKey);
+                }
+                else {
+                    delete animation[animatableKey];
+                }
+            }
+        }
+        return propKeys;
+    }
+    function isCollection(obj) {
+        return obj.constructor === Array || obj.constructor === NodeList;
+    }
+    function setCssValue(property, value) {
+        switch (property) {
+            case 'opacity':
+                return parseFloat(value);
+            case 'height':
+            case 'width':
+            case 'left':
+            case 'top':
+            case 'right':
+            case 'bottom':
+                return parseInt(value) + 'px';
+        }
+    }
+    function getValueFromCSS(property, value) {
+        if (property === 'opacity') {
+            return parseFloat(value);
+        }
+        return parseInt(value, 10);
     }
 
     return {
@@ -180,19 +224,22 @@ function animator(targetAnimationState, duration) {
     }
 }
 //tweening functions
-function linearTween(currentTime, intialValue, finalValue, duration) {
-    var delta = finalValue - intialValue;
-    return delta * (currentTime / duration) + intialValue;
+function linearTween(currentTime, initialValue, changeInValue, duration) {
+    return changeInValue * (currentTime / duration) + initialValue;
 }
 
-function easeInQuadTween(currentTime, initialValue, finalValue, duration) {
-    var delta = finalValue - initialValue;
+function easeInQuadTween(currentTime, initialValue, changeInValue, duration) {
     var time = (currentTime / duration);
     time = Math.pow(time, 2);
-    return (delta * time) + initialValue;
+    return (changeInValue * time) + initialValue;
 }
-
-const animatableCSS = ['opacity', 'width', 'height', 'translateX', 'translateY']
+function easeInElastic(t, b, c, d) {
+    var s=1.70158;var p=0;var a=c;
+    if (t===0) return b;  if ((t/=d)===1) return b+c;  if (!p) p=d*.3;
+    if (a < Math.abs(c)) { a=c; s=p/4; }
+    else s = p/(2*Math.PI) * Math.asin (c/a);
+    return -(a*Math.pow(2,10*(t-=1)) * Math.sin( (t*d-s)*(2*Math.PI)/p )) + b;
+}
 /**
  * An animation engine for javascript objects
  * Example usage:

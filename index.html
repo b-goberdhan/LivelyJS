@@ -2,7 +2,7 @@
 <html>
     <head>
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.5/angular.min.js"></script>
-        <script src="./janimate.js"></script>
+        <script src="./src/janimate.js"></script>
         <script src="./test.js"></script>
     </head>
     <body ng-app="app">
@@ -10,6 +10,6 @@
             ng-click="onClick()"
          style="width: 100px; height: 100px; background: red; position: fixed;"
          ng-style="getObj1()"></div>
-         <div style="opacity : 0; width: 100px; height: 100px; background: blue; position: fixed; left: 200px"></div>
+         <div id="mydiv1" style="opacity : 1; width: 100px; height: 100px; background: blue; position: fixed; left: 200px"></div>
     </body>
 </html>
