@@ -143,49 +143,42 @@ function animator(animation, duration) {
         }
         else {
             targetKeys.forEach(function (key) {
-                startProperties[key] = animation.target[key];
+                startingProperties[key] = animation.target[key];
             });
         }
         return startingProperties;
 
     }
+    function targetPropertiesFound(target, animatableKey) {
+        return target && target.hasOwnProperty(animatableKey) || (target.style && target.style.hasOwnProperty(animatableKey));
+    }
+    function hasTargetedProp(propertyName, target) {
+        if (target.constructor === Object) {
+            return targetPropertiesFound(target, propertyName);
+        }
+        else if (target.constructor === NodeList) {
+            for (var i = 0; i < target.length; i++) {
+                if (!targetPropertiesFound(target[i], propertyName)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return targets.every(function (target) {
+            return targetPropertiesFound(target, propertyName);
+        });
+    }
     function getTargetPropKeys(animation) {
         var propKeys = [];
-        function targetPropertiesFound(target, animatableKey) {
-            return target && target.hasOwnProperty(animatableKey) || (target.style && target.style.hasOwnProperty(animatableKey));
-        }
+
         for (var animatableKey in animation) {
             if (animation.hasOwnProperty(animatableKey) && filterTargetAnimationKey(animatableKey)) {
                 //now make sure the animation targets has this property
-                if (animation.target.constructor === Array || animation.target.constructor === NodeList) {
-                    //make sure all element have these
-                    var elementsHaveTargetedProps;
-                    if (animation.target.constructor === NodeList) {
-                        for (var i = 0; i < animation.target.length; i++) {
-                            if (!targetPropertiesFound(animation.target[i], animatableKey)) {
-                                elementsHaveTargetedProps = false;
-                                break;
-                            }
-                            else {
-                                elementsHaveTargetedProps = true;
-                            }
-                        }
-                    }
-                    else {
-                        elementsHaveTargetedProps = animation.target.every(function (target) {
-                            return targetPropertiesFound(target, animatableKey)
-                        });
-                    }
 
-                    if (elementsHaveTargetedProps) {
-                        propKeys.push(animatableKey);
-                    }
-                    else {
-                        delete animation[animatableKey];
-                    }
-                }
-                // if we only have one target
-                else if (targetPropertiesFound(animation.target, animatableKey)) {
+                //make sure all element have these
+                var elementsHaveTargetedProps = hasTargetedProp(animatableKey, animation.target);
+
+                if (elementsHaveTargetedProps) {
                     propKeys.push(animatableKey);
                 }
                 else {
@@ -212,6 +205,7 @@ function animator(animation, duration) {
         }
     }
     function getValueFromCSS(property, value) {
+
         if (property === 'opacity') {
             return parseFloat(value);
         }
@@ -221,13 +215,12 @@ function animator(animation, duration) {
     return {
         play : play,
         stop : stop
-    }
+    };
 }
 //tweening functions
 function linearTween(currentTime, initialValue, changeInValue, duration) {
     return changeInValue * (currentTime / duration) + initialValue;
 }
-
 function easeInQuadTween(currentTime, initialValue, changeInValue, duration) {
     var time = (currentTime / duration);
     time = Math.pow(time, 2);
@@ -235,7 +228,7 @@ function easeInQuadTween(currentTime, initialValue, changeInValue, duration) {
 }
 function easeInElastic(t, b, c, d) {
     var s=1.70158;var p=0;var a=c;
-    if (t===0) return b;  if ((t/=d)===1) return b+c;  if (!p) p=d*.3;
+    if (t===0) return b;  if ((t/=d)===1) return b+c;  if (!p) p=d*0.3;
     if (a < Math.abs(c)) { a=c; s=p/4; }
     else s = p/(2*Math.PI) * Math.asin (c/a);
     return -(a*Math.pow(2,10*(t-=1)) * Math.sin( (t*d-s)*(2*Math.PI)/p )) + b;
