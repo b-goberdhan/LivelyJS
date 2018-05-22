@@ -1,62 +1,64 @@
-function animator(animation, duration) {
-    var isPlaying,
-        animationFrame,
-        targetPropertyKeys,
-        startProperties,
-        startTime;
+function Animator(animation, duration) {
+    this.animation = animation;
+    this.duration = duration;
+    this.isPlaying = undefined;
+    this.animationFrame = undefined;
+    this.targetPropertyKeys = undefined;
+    this.startProperties = undefined;
+    this.startTime = undefined;
 
-    var play = function() {
-        if (typeof animation.target === 'string') {
-            animation.target = document.querySelectorAll(animation.target);
+    this.play = function() {
+        if (typeof this.animation.target === 'string') {
+            this.animation.target = document.querySelectorAll(this.animation.target);
         }
-        targetPropertyKeys = getTargetPropKeys(animation);
-        startProperties = getStartingProperties(targetPropertyKeys, animation);
-        animationFrame = requestAnimationFrame(animate);
-        isPlaying = true;
+        this.targetPropertyKeys = getTargetedProperties(animation);
+        this.startProperties = getInitialTargetPropertyValues(this.targetPropertyKeys, this.animation);
+        this.animationFrame = requestAnimationFrame(this.animate);
+        this.isPlaying = true;
         
     };
 
-    var stop = function() {
-        isPlaying = false;
-        if (animationFrame) {
-           cancelAnimationFrame(animationFrame);
+    this.stop = function() {
+        this.isPlaying = false;
+        if (this.animationFrame) {
+           cancelAnimationFrame(this.animationFrame);
         }
     };
 
-    var animate = function(timeStamp) {
-        if (!startTime) {
-            startTime = timeStamp;
+    this.animate = function(timeStamp) {
+        if (!this.startTime) {
+            this.startTime = timeStamp;
         }
-        var currentTime = timeStamp - startTime;
-        if (isCollection(animation.target)) {
-            if (animation.target.constructor === Array) {
-                targetPropertyKeys.forEach(function (key) {
-                    for (var i = 0; i < animation.target.length; i++) {
-                        animation.target[i][key] = animateProperty(currentTime, key, duration, startProperties[i][key], animation.ease);
+        var currentTime = timeStamp - this.startTime;
+        if (isCollection(this.animation.target)) {
+            if (this.animation.target.constructor === Array) {
+                this.targetPropertyKeys.forEach(function (key) {
+                    for (var i = 0; i < this.animation.target.length; i++) {
+                        this.animation.target[i][key] = tweenProperty(currentTime, key, this.duration, this.startProperties[i][key], this.animation.ease);
                     }
-                });
+                }.bind(this));
             }
-            else if (animation.target.constructor === NodeList) {
-                targetPropertyKeys.forEach(function (key) {
-                    for (var i = 0; i < animation.target.length; i++) {
-                        var startVal = getValueFromCSS(key, startProperties[i][key]);
-                        animation.target[i].style[key] = setCssValue(key, animateProperty(currentTime, key, duration, startVal, animation.ease));
+            else if (this.animation.target.constructor === NodeList) {
+                this.targetPropertyKeys.forEach(function (key) {
+                    for (var i = 0; i < this.animation.target.length; i++) {
+                        var startVal = getValueFromCSS(key, this.startProperties[i][key]);
+                        animation.target[i].style[key] = setCssValue(key, tweenProperty(currentTime, key, this.duration, startVal, this.animation.ease));
                     }
-                });
+                }.bind(this));
             }
 
         }
         else {
-            if (animation.target.style) {
-                targetPropertyKeys.forEach(function (key) {
-                    var startVal = getValueFromCSS(key, startProperties[key]);
-                    animation.target.style[key] = setCssValue(key, animateProperty(currentTime, key, duration, startVal, animation.ease));
-                });
+            if (this.animation.target.style) {
+                this.targetPropertyKeys.forEach(function (key) {
+                    var startVal = getValueFromCSS(key, this.startProperties[key]);
+                    this.animation.target.style[key] = setCssValue(key, tweenProperty(currentTime, key, this.duration, startVal, this.animation.ease));
+                }.bind(this));
             }
             else {
-                targetPropertyKeys.forEach(function(key) {
-                    animation.target[key] = animateProperty(currentTime, key, duration, startProperties[key], animation.ease);
-                });
+                this.targetPropertyKeys.forEach(function(key) {
+                    this.animation.target[key] = tweenProperty(currentTime, key, this.duration, this.startProperties[key], this.animation.ease);
+                }.bind(this));
             }
 
 
@@ -64,29 +66,27 @@ function animator(animation, duration) {
 
         var doneAnimation = (currentTime >= duration);
         if (doneAnimation) {
-            stop();
-            if (animation.update) {
+            this.stop();
+            if (this.animation.update) {
                 var updatedProps = [];
-                targetPropertyKeys.forEach(function (key) {
+                this.targetPropertyKeys.forEach(function (key) {
                     var obj = {};
-                    obj[key] = animation.target[key];
+                    obj[key] = this.animation.target[key];
                     updatedProps.push(obj);
-                });
-                animation.update(updatedProps);
+                }.bind(this));
+                this.animation.update(updatedProps);
             }
-            if (animation.done) {
-                animation.done();
+            if (this.animation.done) {
+                this.animation.done();
             }
         }
         else {
-            requestAnimationFrame(animate);
+            requestAnimationFrame(this.animate);
         }
         
-    };
+    }.bind(this);
 
-
-
-    function animateProperty(currentTime, key, duration, startVal, ease) {
+    var tweenProperty = function(currentTime, key, duration, startVal, ease) {
         var startingPropVal = startVal;
         var desiredPropVal = animation[key];
         var changeInValue = desiredPropVal - startVal;
@@ -103,38 +103,32 @@ function animator(animation, duration) {
             tweenedValue = ease(currentTime, startingPropVal, changeInValue, duration);
         }
 
-        if (animation.update) {
+        if (this.animation.update) {
             var obj = {};
             obj[key] = tweenedValue;
-            animation.update([obj]);
+            this.animation.update([obj]);
         }
         return tweenedValue;
-    }
+    }.bind(this);
     // helpers
     function filterTargetAnimationKey(key) {
         return key !== 'target' && key !== 'update' && key !== 'ease' && key !== 'done';
     }
-    function getStartingProperties(targetKeys, animation) {
+    function getInitialTargetPropertyValues(targetKeys, animation) {
         var startingProperties = {};
         if (isCollection(animation.target)) {
-            if (animation.target.constructor === Array) {
-                targetKeys.forEach(function (key) {
-                    for (var i = 0; i < animation.target.length; i++) {
-                        startingProperties[i] = {};
-                        startingProperties[i][key] = animation.target[i][key];
-                    }
-                });
-            }
-            else if (animation.target.constructor === NodeList) {
-                targetKeys.forEach(function (key) {
-                    for (var i = 0; i < animation.target.length; i++) {
-                        startingProperties[i] = {};
+            targetKeys.forEach(function (key) {
+                for (var i = 0; i < animation.target.length; i++) {
+                    startingProperties[i] = {};
+                    if (animation.target[i].style) {
                         startingProperties[i][key] = animation.target[i].style[key];
                     }
-                });
-            }
+                    else {
+                        startingProperties[i][key] = animation.target[i][key];
+                    }
 
-
+                }
+            });
         }
         else if (animation.target.style) {
             targetKeys.forEach(function (key) {
@@ -149,40 +143,42 @@ function animator(animation, duration) {
         return startingProperties;
 
     }
-    function targetPropertiesFound(target, animatableKey) {
-        return target && target.hasOwnProperty(animatableKey) || (target.style && target.style.hasOwnProperty(animatableKey));
+    function targetHasOwnProperty(target, animateKey) {
+        return target && target.hasOwnProperty(animateKey) || (target.style && target.style.hasOwnProperty(animateKey));
     }
-    function hasTargetedProp(propertyName, target) {
+    function hasProperty(target, propertyName) {
         if (target.constructor === Object) {
-            return targetPropertiesFound(target, propertyName);
+            return targetHasOwnProperty(target, propertyName);
         }
         else if (target.constructor === NodeList) {
             for (var i = 0; i < target.length; i++) {
-                if (!targetPropertiesFound(target[i], propertyName)) {
+                if (!targetHasOwnProperty(target[i], propertyName)) {
                     return false;
                 }
             }
             return true;
         }
-        return targets.every(function (target) {
-            return targetPropertiesFound(target, propertyName);
+        return target.every(function (target) {
+            return targetHasOwnProperty(target, propertyName);
         });
     }
-    function getTargetPropKeys(animation) {
+    function getTargetedProperties(animation) {
         var propKeys = [];
 
-        for (var animatableKey in animation) {
-            if (animation.hasOwnProperty(animatableKey) && filterTargetAnimationKey(animatableKey)) {
+        for (var property in animation) {
+            if (animation.hasOwnProperty(property) && filterTargetAnimationKey(property)) {
                 //now make sure the animation targets has this property
 
-                //make sure all element have these
-                var elementsHaveTargetedProps = hasTargetedProp(animatableKey, animation.target);
+                // make sure the targeted property is present in the animation target(s)
+                // if there are multiple elements and one of the elements does not have a targeted
+                // property, then the animation on that property is not applied.
+                var elementsHaveTargetedProps = hasProperty(animation.target, property);
 
                 if (elementsHaveTargetedProps) {
-                    propKeys.push(animatableKey);
+                    propKeys.push(property);
                 }
                 else {
-                    delete animation[animatableKey];
+                    delete animation[property];
                 }
             }
         }
@@ -205,17 +201,18 @@ function animator(animation, duration) {
         }
     }
     function getValueFromCSS(property, value) {
-
-        if (property === 'opacity') {
-            return parseFloat(value);
+        switch (property) {
+            case 'opacity':
+                return parseFloat(value);
+            case 'height':
+            case 'width':
+            case 'left':
+            case 'top':
+            case 'right':
+            case 'bottom':
+                return parseInt(value, 10);
         }
-        return parseInt(value, 10);
     }
-
-    return {
-        play : play,
-        stop : stop
-    };
 }
 //tweening functions
 function linearTween(currentTime, initialValue, changeInValue, duration) {
@@ -244,8 +241,12 @@ function easeInElastic(t, b, c, d) {
  * })
  */
 
-function janimate(targetAnimation, duration) {
-    return animator(targetAnimation, duration); 
+
+
+function Lively(targetAnimation, duration) {
+    this.animator = new Animator(targetAnimation, duration);
+    this.play = function () { this.animator.play(); };
+    this.stop = function () { this.animator.stop(); };
 }
 
 //animateable attributes:

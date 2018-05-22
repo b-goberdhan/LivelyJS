@@ -31,10 +31,11 @@ app.controller("HelloController", function($scope, $element, $timeout) {
         .play();
         */
         var node = document.querySelector("#mydiv1");
-        janimate({
+        new Lively({
             target : 'div',
-            left: 400,
+            opacity: 0,
             update: function(updatedProps) {
+                console.log(updatedProps)
                 //$scope.$apply();
                 //console.log(updatedProps);
                 //var el = document.querySelector('#JSobject pre');
