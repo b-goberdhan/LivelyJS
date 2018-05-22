@@ -1,0 +1,11 @@
+{
+  "name": "LivelyJS",
+  "version": "0.0.1",
+  "dependencies": {},
+  "devDependencies": {
+    "grunt": "^1.0.2",
+    "grunt-contrib-jshint": "^1.1.0",
+    "grunt-contrib-uglify": "^3.3.0",
+    "grunt-contrib-watch": "^1.1.0"
+  }
+}
