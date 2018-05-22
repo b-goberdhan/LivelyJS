@@ -12,8 +12,8 @@ module.exports = function (grunt) {
         },
         uglify : {
             build : {
-                src : ["src/janimate.js"],
-                dest : "dist/janimate.min.js"
+                src : ["src/lively.js"],
+                dest : "dist/lively.min.js"
             }
         }
     });

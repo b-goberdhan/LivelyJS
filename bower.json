@@ -1,0 +1,23 @@
+{
+  "name": "livelyjs",
+  "description": "An easy to use, javascript animation library",
+  "main": "src/janimate.js",
+  "authors": [
+    "Brandon G <brandongob@gmail.com>"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "animation",
+    "javascript",
+    "css",
+    "transform"
+  ],
+  "homepage": "https://github.com/b-goberdhan/LivelyJS",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
