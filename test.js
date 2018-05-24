@@ -31,8 +31,8 @@ app.controller("HelloController", function($scope, $element, $timeout) {
         .play();
         */
         var node = document.querySelector("#mydiv1");
-        new Lively({
-            target : 'div',
+        lively.animate({
+            targets : node,
             opacity: 0,
             update: function(updatedProps) {
                 console.log(updatedProps)
@@ -43,9 +43,14 @@ app.controller("HelloController", function($scope, $element, $timeout) {
             },
             done : function () {
             },
-            ease : easeInQuadTween
-        }, 1000)
-        .play();
+        }, 3000);
+        lively.play();
+        $timeout(function() {
+            lively.pause();
+        }, 1000);
+        $timeout(function() {
+            lively.play();
+        },5000);
         //animator.play();
     };
     
