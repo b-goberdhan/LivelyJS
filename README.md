@@ -16,4 +16,5 @@ A flexible JavaScript animation library for simple to complex animations.
 
 
 ## Installing:
+ bower : bower install lively
  

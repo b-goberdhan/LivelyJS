@@ -6,7 +6,7 @@
     targets : {} || [] || ''
     prop1 : 
     prop2 
-    eases : {} || [{}] || function,
+    eases : string ||{} || [{}] || function,
     // invoke a function when a certain property value is met
     trigger : {}
 
@@ -23,20 +23,37 @@
     const easings = {
         default :  (currentTime, initialValue, changeInValue, duration) => {
             return changeInValue * (currentTime / duration) + initialValue;
-        }
-    }
-    const reservedAnimatableProperties = ['update', 'done', 'targets', 'eases'];
+        },
+        easeInQuad : (currentTime, initialValue, changeInValue, duration) => {
+            return changeInValue*(currentTime/=duration)*currentTime + initialValue;
+        },
+        easeOutQuad : (t, b, c, d) => {
+            return -c * (t/=d)*(t-2) + b;
+        },
+        easeInOutQuad: function (t, b, c, d) {
+            if ((t/=d/2) < 1) return c/2*t*t + b;
+            return -c/2 * ((--t)*(t-2) - 1) + b;
+        },
+        
+    };
+    const reservedAnimatableProperties = ['update', 'done', 'targets', 'eases', 'discard'];
     const animationFactory = (() => {
         let factory = {};
         function createAnimatebleTarget(target) {
             return {
                 animatable : target,
                 startState : (target.style) ? copy(target.style) : copy(target)
-            }
+            };
         }
         function getTargets(targets) {
             let animatedTargets = [];
-            if (targets.length) {
+            if (typeof targets === 'string') {
+                let createdTargets = document.querySelectorAll(targets);
+                for (let i = 0; i < createdTargets.length; i++) {
+                    animatedTargets.push(createAnimatebleTarget(createdTargets[i]));
+                }
+            }
+            else if (targets.length) {
                 for (let i = 0; i < targets.length; i++) {
                     animatedTargets.push(createAnimatebleTarget(target[i]));
                 }
@@ -48,7 +65,7 @@
         }
         function getProperties(animatable) {
             let desiredPropertyValues = {};
-            for (property in animatable) {
+            for (let property in animatable) {
                 if (!reservedAnimatableProperties.includes(property)) {
                     desiredPropertyValues[property] = animatable[property];
                 }
@@ -61,6 +78,9 @@
             };
             if (typeof eases === 'function') {
                 animationEases.default = eases;
+            }
+            else if (typeof eases === 'string') {
+                animationEases.default = easings[eases];
             }
             else if (eases && eases.length) {
                 for (let i = 0; i < eases.length; i++) {
@@ -76,9 +96,12 @@
                 duration : durationMs,
                 targets : getTargets(animateObj.targets),
                 properties : getProperties(animateObj),
-                eases : getEases(animateObj.eases) 
-            }
-        }
+                eases : getEases(animateObj.eases),
+                preserve : animateObj.preserve,
+                onDone : animateObj.done,
+                onUpdate : animateObj.update
+            };
+        };
         // TODO: a way to have animations trigger each other
         // and other events.
         /*factory.createChain = () => {
@@ -88,7 +111,7 @@
     })();
     const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'translateX', 'translateY', 'rotate'];
     const animationRendererFactory = (() => {
-        let factory = {}
+        let factory = {};
         function setCssValue(cssProperty, value) {
             if (cssProperty === 'opacity') {
                 return parseFloat(value) + '';
@@ -105,10 +128,9 @@
                 return parseInt (value, 10);
             }
         }
-        //currentTime, startingPropVal, changeInValue, duration
-        function tick(timeStamp, elapsedTime, animation) {
+        function tick(elapsedTime, animation) {
             let finished = false;
-            for (property in animation.properties) {
+            for (let property in animation.properties) {
                 if (reservedAnimatableProperties.includes(property)) {
                     continue;
                 }
@@ -116,6 +138,7 @@
                 for (let i = 0; i < animation.targets.length; i++) {
                     let target = animation.targets[i];
                     let isDOM = (target.animatable.style !== undefined);
+                    // Check if the animation is completed
                     if (elapsedTime >= animation.duration) {
                         if (target.animatable.style) {
                             target.animatable.style[property] = setCssValue(property, desiredValue);
@@ -123,18 +146,18 @@
                         else {
                             target.animatable[property] = desiredValue;
                         }
-                        if (target.animatable.update) {
+                        if (animation.onUpdate) {
                             let obj = {};
                             obj[property] = desiredValue;
-                            target.animatable.update(obj);
+                            animation.onUpdate(obj);
                         }
-                        if (target.animatable.done) {
-                            target.animatable.done();
+                        if (animation.onDone) {
+                            animation.onDone(target);
                         }
                         finished = true;
                     }
                     else {
-                        
+                        // Animation is not completed, animate the given property.
                         let startValue = (isDOM) ? getValueFromCSS(property, target.startState[property]) : target.startState[property];
                         let changeInValue = ((isDOM) ? getValueFromCSS(property, desiredValue) : desiredValue) - startValue;
                         let tween = (animation.eases[property]) ? animation.eases[property] : animation.eases.default;
@@ -146,10 +169,10 @@
                         else {
                             currentValue = target.animatable[property];
                         }    
-                        if (target.animatable.update) {
+                        if (animation.onUpdate) {
                             let obj = {};
                             obj[property] = currentValue;
-                            target.animatable.update(obj);
+                            animation.onUpdate(obj);
                         }
                     }
                     
@@ -160,50 +183,75 @@
         factory.createRenderer = () => {
             return {
                 tick : tick
-            }
-        }
+            };
+        };
         return factory;
     })();
-    let animations = []
+
+
+    let queuedAnimations = [];
     let finishedAnimations = [];
     let raf = 0;
     
     const animationEngine = (() => {
         let renderer = animationRendererFactory.createRenderer();
-        let startTime;
-        let currentTime;
-        let isPaused;
+        let startTime = 0,
+         elapsedTime = 0, 
+         pauseTime = 0,
+         isPaused = false, 
+         isStopped = false;
         function play() {
-            isPaused = false;
+            isPaused = isStopped = false;
             raf = requestAnimationFrame(tick);
         }
         function pause() {
             isPaused = true;
-            startTime = currentTime;
+        }
+        function stop() {
+            isStopped = true;
+            startTime = 0;
+            elapsedTime = 0;
+            pauseTime = 0;
+            if (finishedAnimations.length) {
+                queuedAnimations = [].concat(finishedAnimations);
+                finishedAnimations = [];
+            }
+        }
+        function reset() {
+            renderer = animationRendererFactory.createRenderer();
+            startTime = undefined;
+            elapsedTime = undefined;
+            isPaused = false;
         }
         function tick(timeStamp) {
-            if (animations.length && !isPaused) {
+            if (queuedAnimations.length && !isStopped) {
                 if (!startTime) {
-                    startTime = timeStamp
+                    startTime = timeStamp;
                 }
-                currentTime = timeStamp - startTime;
-                if (currentTime)
-                for (let i = 0; i < animations.length; i++) {
-                    let finished = renderer.tick(timeStamp, currentTime, animations[i]);
+                
+                if (isPaused) {
+                    pauseTime = (timeStamp - startTime) - elapsedTime;
+                    elapsedTime = (timeStamp - startTime) - pauseTime; 
+                }
+                else {
+                    elapsedTime = (timeStamp - startTime) - pauseTime; 
+                }
+                for (let i = 0; i < queuedAnimations.length; i++) {
+                    let finished = renderer.tick(elapsedTime, queuedAnimations[i]);
                     if (finished) {
-                        finishedAnimations.push(animations[i]);
-                        animations.splice(i, 1);
-                        delete animations[i];
+                        if (!queuedAnimations[i].preserve) {
+                            finishedAnimations.push(queuedAnimations[i]);
+                        }
+                        queuedAnimations.splice(i, 1);
+                        delete queuedAnimations[i];
                     }
-                    
-                } 
+                }
+
                 ref = requestAnimationFrame(tick);
-            }
-            else if (!animations.length) {
-                startTime = undefined;
             }
             else {
                 cancelAnimationFrame(ref);
+                stop();
             }
             
             
@@ -212,16 +260,24 @@
             play : play,
             pause : pause,
             stop : stop,
-        }
+            reset : reset,
+        };
     })();
 
     let lively = {};
-
+    lively.reset = () => {
+        queuedAnimations = [];
+        finishedAnimations = [];
+        animationEngine.reset();
+    };
+    lively.easings = easings;
     lively.animate = (animateObj, durationMs) => {
-        let animatable = animationFactory.createAnimation(animateObj, durationMs);
-        animations.push(animatable);
-    }
+        let animation = animationFactory.createAnimation(animateObj, durationMs);
+        queuedAnimations.push(animation);
+    };
     lively.play = animationEngine.play;
     lively.pause = animationEngine.pause;
+    lively.stop = animationEngine.stop;
+
     return lively;
 }));

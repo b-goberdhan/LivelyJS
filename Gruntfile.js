@@ -4,11 +4,17 @@ module.exports = function (grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.initConfig({
         jshint: {
-            all: ['Gruntfile.js', 'src/**/*.js']
+            all: ['Gruntfile.js', 'src/**/*.js'],
+            options : {'esversion' : 6}
         },
         watch: {
-            files: ['src/**/*.js'],
-            tasks: ['jshint']
+            jshint : {
+                files: ['src/**/*.js'],
+                tasks: ['jshint'],
+                options : {
+                    livereload: true
+                }
+            }
         },
         uglify : {
             build : {

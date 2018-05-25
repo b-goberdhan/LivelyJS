@@ -9,49 +9,16 @@ app.controller("HelloController", function($scope, $element, $timeout) {
         return o;
     };
     $scope.onClick = function () {
-        /*var obj = { charged : 0};
-        janimate({
-            target : "div",
-            opacity : 1,
-            //left: 300,
-            update: function(updatedProps) {
-                //$scope.$apply();
-                console.log(updatedProps);
-                //var el = document.querySelector('#JSobject pre');
-                //el.innerHTML = JSON.stringify(obj);
-            },
-            done : function () {
-                $scope.obj1 = 
-                { opacity : 0,
-                    left: 0 
-                };
-            },
-            ease : easeInQuadTween
-        }, 5000)
-        .play();
-        */
-        var node = document.querySelector("#mydiv1");
+        var node = document.querySelector("div");
         lively.animate({
-            targets : node,
+            targets : 'div',
             opacity: 0,
-            update: function(updatedProps) {
-                console.log(updatedProps)
-                //$scope.$apply();
-                //console.log(updatedProps);
-                //var el = document.querySelector('#JSobject pre');
-                //el.innerHTML = JSON.stringify(obj);
-            },
-            done : function () {
-            },
-        }, 3000);
-        lively.play();
-        $timeout(function() {
-            lively.pause();
+            update: function() { },
+            eases : 'easeInQuad',
+            preserve : true,
+            done : function () { },
         }, 1000);
-        $timeout(function() {
-            lively.play();
-        },5000);
-        //animator.play();
+        lively.play();
     };
     
     $scope.message = "Hello, AngularJS";	
