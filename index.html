@@ -8,8 +8,9 @@
     <body ng-app="app">
         <div id="mydiv" ng-controller="HelloController"
             ng-click="onClick()"
-         style="width: 100px; height: 100px; background: red; position: fixed;"
-         ng-style="getObj1()"></div>
-         <div id="mydiv1" style="opacity : 1; width: 100px; height: 100px; background: blue; position: fixed; left: 200px"></div>
+         style="width: 100px; height: 100px; background: red; position: fixed;">
+            {{obj1}}
+        </div>
+         <div id="mydiv1" style="transform: translateX(30px); opacity : 1; width: 100px; height: 100px; background: blue; position: fixed; left: 200px"></div>
     </body>
 </html>
