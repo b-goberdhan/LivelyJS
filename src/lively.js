@@ -131,8 +131,9 @@
             }
             else if (eases && eases.length) {
                 for (let i = 0; i < eases.length; i++) {
-                    if(eases[i].property) {
-                        animationEases[property] = eases[i].ease;
+                    for (property in eases[i]) {
+                        animationEases[property] = eases[i][property];
+                        break;
                     }
                 }
             }
@@ -237,7 +238,8 @@
                     // Animation is not completed, animate the given property.
                     let startValue = getValueFromCSS(property, target.startState[property]);
                     let changeInValue = getValueFromCSS(property, desiredValue) - startValue;
-                    let tween = (animation.eases[property]) ? animation.eases[property] : animation.eases.default;
+                    let tweenName = (animation.eases[property]) ? animation.eases[property] : 'default';
+                    let tween = easings[tweenName]; 
                     let currentValue = getValueFromCSS(property, target.animatable.style[property]);
                     target.animatable.style[property] = getCssFromValue(property, tween(elapsedTime, startValue, changeInValue, animation.duration));  
                 }          
@@ -262,10 +264,10 @@
                         }
                         let startValue = (startValues[transformProp]) ? startValues[transformProp] : 0;
                         let changeInValue = (desiredValue[transformProp]) - startValue;
-                        let tween = (animation.eases[transformProp]) ? animation.eases[transformProp] : animation.eases.default;
+                        let tweenName = (animation.eases[transformProp]) ? animation.eases[transformProp] : 'default';
+                        let tween = easings[tweenName]; ;
                         transform[transformProp] = tween(elapsedTime, startValue, changeInValue, animation.duration);
                     }
-                    let x = getCssFromValue('transform', transform);  
                     target.animatable.style.transform = getCssFromValue('transform', transform);  
                 }
                 
@@ -283,7 +285,8 @@
                     // Animation is not completed, animate the given property.
                     let startValue = target.startState[property];
                     let changeInValue = desiredValue - startValue;
-                    let tween = (animation.eases[property]) ? animation.eases[property] : animation.eases.default;
+                    let tweenName = (animation.eases[property]) ? animation.eases[property] : 'default';
+                    let tween = easings[tweenName]; 
                     let currentValue = target.animatable[property];
                     target.animatable[property] = tween(elapsedTime, startValue, changeInValue, animation.duration);
                     
@@ -324,7 +327,14 @@
     let queuedAnimations = [];
     let finishedAnimations = [];
     let raf = 0;
-    
+    let lively = {};
+    let config = {};
+    lively.configure = (options) => {
+        config.onRenderTick = options.onRenderTick;
+        config.preserveAll = options.preserveAll;
+        config.onAllAnimationsComplete = options.onAllAnimationsComplete;
+    };
+
     const animationEngine = (() => {
 
         let renderer = rendererFactory.createRenderer(); 
@@ -357,6 +367,26 @@
             elapsedTime = undefined;
             isPaused = false;
         }
+        function renderAnimations(elapsedTime) {
+            for (let i = 0; i < queuedAnimations.length; i++) {
+                if (queuedAnimations[i]) {
+                    let finished = renderer.tick(elapsedTime, queuedAnimations[i]);
+                    if (queuedAnimations[i].onUpdate && !isPaused) {
+                        queuedAnimations[i].onUpdate(queuedAnimations[i].target);
+                    }
+                    
+                    if (finished) {
+                        if (queuedAnimations[i].onDone) {
+                            queuedAnimations[i].onDone(queuedAnimations[i].target);
+                        }
+                        if (queuedAnimations[i].preserve) {
+                            finishedAnimations.push(queuedAnimations[i]);
+                        }
+                        queuedAnimations.splice(i, 1);
+                    }
+                }
+            }
+        }
         function tick(timeStamp) {
             if (queuedAnimations.length && !isStopped) {
                 if (!startTime) {
@@ -370,29 +400,18 @@
                 else {
                     elapsedTime = (timeStamp - startTime) - pauseTime; 
                 }
-                for (let i = 0; i < queuedAnimations.length; i++) {
-                    if (queuedAnimations[i]) {
-                        let finished = renderer.tick(elapsedTime, queuedAnimations[i]);
-                        if (queuedAnimations[i].onUpdate && !isPaused) {
-                            queuedAnimations[i].onUpdate(queuedAnimations[i].target);
-                        }
-                        
-                        if (finished) {
-                            if (queuedAnimations[i].onDone) {
-                                queuedAnimations[i].onDone(queuedAnimations[i].target);
-                            }
-                            if (queuedAnimations[i].preserve) {
-                                finishedAnimations.push(queuedAnimations[i]);
-                            }
-                            queuedAnimations.splice(i, 1);
-                        }
-                    }
+                renderAnimations(elapsedTime);
+                if (config.onRenderTick) {
+                    config.onRenderTick();
                 }
                 ref = requestAnimationFrame(tick);
             }
             else {
                 cancelAnimationFrame(ref);
                 stop();
+                if (config.onAllAnimationsComplete) {
+                    config.onAllAnimationsComplete();
+                }
             }
             
             
@@ -405,7 +424,7 @@
         };
     })();
 
-    let lively = {};
+    
     lively.reset = () => {
         queuedAnimations = [];
         finishedAnimations = [];
@@ -415,6 +434,7 @@
     lively.animate = (animateObj, durationMs) => {
         let animation = animationFactory.createAnimation(animateObj, durationMs);
         queuedAnimations.push(animation);
+        return queuedAnimations.length - 1;
     };
     lively.play = animationEngine.play;
     lively.pause = animationEngine.pause;
