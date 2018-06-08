@@ -1,10 +1,8 @@
 (function (context, configure) {
+
     context.lively = configure();
 }(this, () => {
-   
-    function copy(obj) {
-        return JSON.parse(JSON.stringify(obj));
-    }
+
     // Easing functions
     const easings = {
         default :  (currentTime, initialValue, changeInValue, duration) => {
@@ -22,92 +20,149 @@
         },
         
     };
-    // Css related constants
+
     const reservedAnimatableProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
-    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom'];
-    const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY'];
-    const cssTransformFilters = (() => {
+    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'border-radius'];
 
-        let removeParenthesesRegex = /[^()]+/;
-        let isolatePropertyValueRegex = /\(([^()])+\)/;
-        function filter(string, regex) {
-            let result = string.match(regex);
-            return result ? result[0] : undefined;
+    // NEW CSS STUFF
+    const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
+    function isElement(object) {
+        return (object instanceof Element);
+    }
+    function isObject(object) {
+        return (object instanceof Object);
+    }
+    function setCssValue(element, property, value) {
+        if (isElement(element)) {
+            element.style[property] = value;
         }
-        function removeParentheses(string) { 
-            return filter(string, removeParenthesesRegex);
+    }
+    function getCssValue(element, property) {
+        if (isElement(element)) {
+            let styleValue = getComputedStyle(element).getPropertyValue(property);
+            if (property === 'transform') return styleValue;
+            return styleValue;
         }
-        function isolatePropertyValue(string) { 
-            return filter(string, isolatePropertyValueRegex); 
+    }
+    function setCssTransform(element, matrix) {
+        if (isElement(element) && matrix) {
+            let matrixString = 'matrix(' + matrix.scaleX + ', '
+                + matrix.skewX + ', '
+                + matrix.skewY + ', '
+                + matrix.scaleY + ', '
+                + matrix.translateX + ', '
+                + matrix.translateY + ')';
+            element.style.transform = matrixString;
         }
+    }
+    function getRotationMatrix(rotate) {
         return {
-            
-            removeParenthesesRegex : removeParenthesesRegex,
-            isolatePropertyValueRegex : isolatePropertyValueRegex,
-
-            removeParentheses : removeParentheses,
-            isolatePropertyValue : isolatePropertyValue,
-            isolateValueAndRemoveParentheses : (string) => {
-                let value = filter(string, isolatePropertyValueRegex);
-                return value ? filter(value, removeParenthesesRegex) : undefined;
-            }
+            scaleX : Math.cos(rotate),
+            skewX : Math.sin(rotate),
+            skewY : (-Math.sin(rotate)),
+            scaleY : (Math.cos(rotate)),
+            translateX : 0,
+            translateY : 0
         };
-        
-    })();
-    const cssPropertyDefaults = {
-        opacity : 1,
-        translateX : 0,
-        translateY : 0,
-        scaleX : 1,
-        scaleY : 1,
-        rotate : 0,
-        top : 0,
-        left: 0,
-        right : 0,
-        bottom : 0
-    };
+    }
+    function addMatrix(mat1, mat2) {
+        return {
+            scaleX : mat1.scaleX + mat2.scaleX,
+            skewX: mat1.skewX + mat2.skewX,
+            skewY: mat1.skewY + mat2.skewY,
+            scaleY: mat1.scaleY + mat2.scaleY,
+            translateX : mat1.translateX + mat2.translateX,
+            translateY : mat1.translateY + mat2.translateY,
+        };
+    }
 
+    function getCssTransform(element) {
+        if (isElement(element)) {
+            let matrixString = getCssValue(element, 'transform');
+            let matrixValues = [1,0,0,1,0,0];
+            if (matrixString !== 'none') matrixValues = matrixString.match(/\(([^()])+\)/)[0].match(/[^()]+/)[0].split(',');
+            return {
+                scaleX : parseFloat(matrixValues[0]),
+                skewY : parseFloat(matrixValues[1]),
+                skewX : parseFloat(matrixValues[2]),
+                scaleY : parseFloat(matrixValues[3]),
+                translateX : parseFloat(matrixValues[4]),
+                translateY : parseFloat(matrixValues[5]),
+            };
+        }
+    }
+    function getCssUnit(element, property) {
+        if (isElement(element)) {
+            let styleValue = getComputedStyle(element).getPropertyValue(property);
+            if (styleValue.endsWith('px')) return 'px';
+            if (styleValue.endsWith('%')) return '%';
+            else return '';
+        }
+    }
     // Animation related constants
     const animationFactory = (() => {
         let factory = {};
-        function createAnimatebleTarget(target) {
+        function createAnimatable(target, desiredProperties) {
+            let startProperties = {};
+            for (let property in desiredProperties) {
+                if (isElement(target) && property === 'transform') {
+                    startProperties[property] = getCssTransform(target)//getCssValue(target, property);
+                }
+                else if (isElement(target) && cssProperties.includes(property)) {
+                    let cssValue = getCssValue(target, property);
+                    let unit = getCssUnit(target,property);
+                    if (unit !== '') startProperties[property] = parseFloat(cssValue.substring(0, cssValue.indexOf(unit)));
+                    else startProperties[property] = parseFloat(cssValue);
+                }
+                else {
+                    startProperties[property] = target[property];
+                }
+
+            }
+            if (desiredProperties.transform) {
+                let rotationMatrix = getRotationMatrix(desiredProperties.transform.rotate);
+                let finalMatrix = {
+                    scaleX : !desiredProperties.transform.scaleX ? startProperties.transform.scaleX : desiredProperties.transform.scaleX,
+                    skewY : !desiredProperties.transform.skewY ? startProperties.transform.skewY : desiredProperties.transform.skewY,
+                    skewX : !desiredProperties.transform.skewX ? startProperties.transform.skewX : desiredProperties.transform.skewX,
+                    scaleY : !desiredProperties.transform.scaleY ? startProperties.transform.scaleY : desiredProperties.transform.scaleY,
+                    translateX : !desiredProperties.transform.translateX ? startProperties.transform.translateX : desiredProperties.transform.translateX,
+                    translateY : !desiredProperties.transform.translateY ? startProperties.transform.translateY : desiredProperties.transform.translateY,
+                };
+                //desiredProperties.transform = addMatrix(finalMatrix, rotationMatrix);
+                desiredProperties.transform = finalMatrix;
+            }
             return {
-                animatable : target,
-                startState : (target.style) ? copy(target.style) : copy(target)
-            };
+                target : target,
+                startProperties: startProperties,
+                desiredProperties: desiredProperties
+            }
         }
-        function getTargets(targets) {
+        function getAnimatables(targets, properties) {
             let animatedTargets = [];
             if (typeof targets === 'string') {
                 let createdTargets = document.querySelectorAll(targets);
                 for (let i = 0; i < createdTargets.length; i++) {
-                    animatedTargets.push(createAnimatebleTarget(createdTargets[i]));
+                    animatedTargets.push(createAnimatable(createdTargets[i], properties));
                 }
             }
             else if (targets.length) {
                 for (let i = 0; i < targets.length; i++) {
-                    animatedTargets.push(createAnimatebleTarget(target[i]));
+                    animatedTargets.push(createAnimatable(target[i], properties));
                 }
             }
             else if (targets) {
-                animatedTargets.push(createAnimatebleTarget(targets));
+                animatedTargets.push(createAnimatable(targets, properties));
             }
             return animatedTargets;
         }
         function getProperties(animatable) {
             let desiredPropertyValues = {};
-            let transform = {
-                translateX : undefined,
-                translateY : undefined,
-                rotate : undefined,
-                scaleX : undefined,
-                scaleY : undefined
-            };
             for (let property in animatable) {
                 if (!reservedAnimatableProperties.includes(property)) {
                     if (cssTransformProperties.includes(property)) {
                         if (!desiredPropertyValues.transform) {
-                            desiredPropertyValues.transform = transform;
+                            desiredPropertyValues.transform = { };
                         }
                         desiredPropertyValues.transform[property] = animatable[property];
                     }
@@ -131,7 +186,7 @@
             }
             else if (eases && eases.length) {
                 for (let i = 0; i < eases.length; i++) {
-                    for (property in eases[i]) {
+                    for (let property in eases[i]) {
                         animationEases[property] = eases[i][property];
                         break;
                     }
@@ -142,8 +197,7 @@
         factory.createAnimation = (animateObj, durationMs) => {
             return {
                 duration : durationMs,
-                targets : getTargets(animateObj.targets),
-                properties : getProperties(animateObj),
+                animatables : getAnimatables(animateObj.targets, getProperties(animateObj)),
                 eases : getEases(animateObj.eases),
                 preserve : animateObj.preserve,
                 onDone : animateObj.done,
@@ -152,177 +206,69 @@
         };
         return factory;
     })();
+    const animator = (() => {
+        function tickCssTransform(currentTime, duration, animatable, tween) {
+            let target = animatable.target;
+            let desiredTransforms = animatable.desiredProperties.transform;
+            let startingProperties = animatable.startProperties.transform;
+            let currentMatrix = {};
 
-    const rendererFactory = (() => {
-        let factory = {};
-        function removeCssType(cssValue) {
-            if (cssValue) {
-                return parseInt(cssValue, 10);
+            for (let property in desiredTransforms) {
+                let startVal = startingProperties[property];
+                let changeInVal = desiredTransforms[property] - startVal;
+                if (currentTime >= duration) currentMatrix[property] = desiredTransforms[property];
+                else currentMatrix[property] = tween(currentTime, startVal, changeInVal, duration);
             }
-        }
-        function getTransformFromCss(cssValue) {
-            let matrix = {};
-            //translateValues
-            if (cssValue === '') {
-                return matrix;
-            }
-            else if (cssValue.startsWith('translateX(')) {
-                matrix.translateX = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            else if (cssValue.startsWith('translateY(')) {
-                matrix.translateY = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            else if (cssValue.startsWith('translate(')) {
-                let translate = cssTransformFilters.isolateValueAndRemoveParentheses(cssValue).split(',');
-                matrix.translateX = removeCssType(translate[0], 10);
-                matrix.translateY = removeCssType(translate[1], 10);
-            }
-            else if (cssValue.startsWith('scaleX(')) {
-                matrix.scaleX = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            else if (cssValue.startsWith('scaleY(')) {
-                matrix.scaleY = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            else if (cssValue.startsWith('scale(')) {
-                matrix.scaleX = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-                matrix.scaleY = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            else if (cssValue.startsWith('rotate(')) {
-                matrix.rotate = removeCssType(cssTransformFilters.isolateValueAndRemoveParentheses(cssValue));
-            }
-            return matrix;
-        } 
-        function getValueFromCSS(cssProperty, cssValue) {
 
-            if (cssProperty === 'opacity') {
-                if (cssValue === '') {
-                    return cssPropertyDefaults.opacity;
-                }
-                return parseFloat(cssValue);
-            }
-            else if (cssProperty === 'transform') {
-                return getTransformFromCss(cssValue);
-            }
-            else {
-                if (cssValue === '') {
-                    return cssPropertyDefaults[cssProperty];
-                }
-                return removeCssType(cssValue);
-            }
+            setCssTransform(target, currentMatrix);
+
         }
-        function getCssFromValue(cssProperty, value) {
-            if (cssProperty === 'opacity') {
-                return parseFloat(value) + '';
-            }
-            else if (cssProperty === 'transform') {
-                let scaleX = value.scaleX ? value.scaleX + 'px' : '1';
-                let scaleY = value.scaleY ? value.scaleY + 'px' : '1';
-                let translateX = value.translateX ? value.translateX + 'px' : '0';
-                let translateY = value.translateY ? value.translateY + 'px' : '0';
-                let rotate = value.rotate ? value.rotate + 'deg' : '0';
-                return 'scale(' + scaleX + ',' + scaleY + ') translate(' +  translateX + ',' + translateY +') rotate(' + rotate + ')';
-            }
-            else {
-                return parseInt(value) + 'px';
-            }
+        function tickCssStyle(currentTime, duration, animatable, property, tween) {
+            let unit = getCssUnit(animatable.target, property);
+            let startValue = parseFloat(animatable.startProperties[property]);
+            let currentValue;
+            let desiredValue = animatable.desiredProperties[property];
+            if (currentTime >= duration) currentValue = desiredValue;
+            else currentValue = tween(currentTime, startValue, (desiredValue - startValue), duration);
+            setCssValue(animatable.target, property, currentValue + unit);
         }
-        function renderCssStyle(elapsedTime, animation, property) {
-            let desiredValue = animation.properties[property];
-            for (let i = 0; i < animation.targets.length; i++) {
-                let target = animation.targets[i];
-                // Check if the animation is completed
-                if (elapsedTime >= animation.duration) {
-                    target.animatable.style[property] = getCssFromValue(property, desiredValue);
-                }
-                else {
-                    // Animation is not completed, animate the given property.
-                    let startValue = getValueFromCSS(property, target.startState[property]);
-                    let changeInValue = getValueFromCSS(property, desiredValue) - startValue;
+        function tickObject(currentTime, duration, animatable, property, tween) {
+            let target = animatable.target;
+            let startValue = animatable.startProperties[property];
+            let currentValue;
+            let desiredValue = animatable.desiredProperties[property];
+            if (currentTime >= duration) currentValue = desiredValue;
+            else currentValue = tween(currentTime, startValue, (desiredValue - startValue), duration);
+            target[property] = currentValue;
+        }
+        function tick(currentTime, animation) {
+            let duration = animation.duration;
+            let finished = (currentTime >= duration);
+            // Iterate through all animatables
+            for (let i = 0; i < animation.animatables.length; i++) {
+                let animatable = animation.animatables[i];
+                let desiredProperties = animatable.desiredProperties;
+                // Iterate through all properties to be animated in the animatable
+                for (let property in desiredProperties) {
                     let tweenName = (animation.eases[property]) ? animation.eases[property] : 'default';
-                    let tween = easings[tweenName]; 
-                    let currentValue = getValueFromCSS(property, target.animatable.style[property]);
-                    target.animatable.style[property] = getCssFromValue(property, tween(elapsedTime, startValue, changeInValue, animation.duration));  
-                }          
-            }
-        }
-        function renderCssTransform(elapsedTime, animation) {
-            let desiredValue = animation.properties.transform; 
-            for (let i = 0; i < animation.targets.length; i++) {
-                let target = animation.targets[i];
-                // Check if the animation is completed
-                if (elapsedTime >= animation.duration) {
-                    target.animatable.style.transform = getCssFromValue('transform', desiredValue);
-                }
-                else {
-                    // Animation is not completed, animate the given property.
-                    let startValues = getValueFromCSS('transform', target.startState.transform);
-                    let transform = {};
-
-                    for (var transformProp in desiredValue) {
-                        if (!desiredValue[transformProp]) {
-                            continue;
-                        }
-                        let startValue = (startValues[transformProp]) ? startValues[transformProp] : 0;
-                        let changeInValue = (desiredValue[transformProp]) - startValue;
-                        let tweenName = (animation.eases[transformProp]) ? animation.eases[transformProp] : 'default';
-                        let tween = easings[tweenName]; ;
-                        transform[transformProp] = tween(elapsedTime, startValue, changeInValue, animation.duration);
+                    let tween = easings[tweenName];
+                    if (isElement(animatable.target) && property === 'transform') {
+                        tickCssTransform(currentTime, duration, animatable, tween);
                     }
-                    target.animatable.style.transform = getCssFromValue('transform', transform);  
-                }
-                
-            }
-        }
-        function renderObject(elapsedTime, animation, property) {
-            let desiredValue = animation.properties[property];
-            for (let i = 0; i < animation.targets.length; i++) {
-                let target = animation.targets[i];
-                // Check if the animation is completed
-                if (elapsedTime >= animation.duration) {
-                    target.animatable[property] = desiredValue;
-                }
-                else {
-                    // Animation is not completed, animate the given property.
-                    let startValue = target.startState[property];
-                    let changeInValue = desiredValue - startValue;
-                    let tweenName = (animation.eases[property]) ? animation.eases[property] : 'default';
-                    let tween = easings[tweenName]; 
-                    let currentValue = target.animatable[property];
-                    target.animatable[property] = tween(elapsedTime, startValue, changeInValue, animation.duration);
-                    
-                }   
-            }
-        }
-        function tick(elapsedTime, animation) {
-            for (let property in animation.properties) {
-                if (reservedAnimatableProperties.includes(property)) {
-                    continue;
-                }
-
-                if (cssProperties.includes(property)) {
-                    renderCssStyle(elapsedTime, animation, property);
-                }
-                else if (property === 'transform') {
-                    renderCssTransform(elapsedTime, animation, property);
-                }
-                else {
-                    renderObject(elapsedTime, animation, property);
-                }
-
-                if (elapsedTime >= animation.duration) {
-                    return true;
+                    else if (isElement(animatable.target)) {
+                        tickCssStyle(currentTime, duration, animatable, property, tween);
+                    }
+                    else if (isObject(animatable.target)) {
+                        tickObject(currentTime, duration, animatable, property, tween);
+                    }
                 }
             }
-            return false;
+            return finished;
         }
-        factory.createRenderer = () => {
-            return {
-                tick : tick
-            };
-        };
-        return factory;
+        return {
+            tick : tick
+        }
     })();
-
 
     let queuedAnimations = [];
     let finishedAnimations = [];
@@ -337,7 +283,7 @@
 
     const animationEngine = (() => {
 
-        let renderer = rendererFactory.createRenderer(); 
+        let renderer = animator.tick;//rendererFactory.createRenderer();
         let startTime = 0;
         let elapsedTime = 0;
         let pauseTime = 0;
@@ -370,7 +316,7 @@
         function renderAnimations(elapsedTime) {
             for (let i = 0; i < queuedAnimations.length; i++) {
                 if (queuedAnimations[i]) {
-                    let finished = renderer.tick(elapsedTime, queuedAnimations[i]);
+                    let finished = renderer(elapsedTime, queuedAnimations[i]);
                     if (queuedAnimations[i].onUpdate && !isPaused) {
                         queuedAnimations[i].onUpdate(queuedAnimations[i].target);
                     }
@@ -404,10 +350,10 @@
                 if (config.onRenderTick) {
                     config.onRenderTick();
                 }
-                ref = requestAnimationFrame(tick);
+                raf = requestAnimationFrame(tick);
             }
             else {
-                cancelAnimationFrame(ref);
+                cancelAnimationFrame(raf);
                 stop();
                 if (config.onAllAnimationsComplete) {
                     config.onAllAnimationsComplete();
