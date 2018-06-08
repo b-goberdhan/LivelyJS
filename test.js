@@ -39,7 +39,7 @@ app.controller("HelloController", function($scope, $element, $timeout) {
                 console.log('done2');
             }
         }, 2000);
-        
+
     });
 
     $scope.onClick = function () {
