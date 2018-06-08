@@ -46,12 +46,7 @@
     }
     function setCssTransform(element, matrix) {
         if (isElement(element) && matrix) {
-            let matrixString = 'matrix(' + matrix.scaleX + ', '
-                + matrix.skewX + ', '
-                + matrix.skewY + ', '
-                + matrix.scaleY + ', '
-                + matrix.translateX + ', '
-                + matrix.translateY + ')';
+            let matrixString = 'matrix(' + matrix.scaleX + ', ' + matrix.skewX + ', ' + matrix.skewY + ', ' + matrix.scaleY + ', ' + matrix.translateX + ', ' + matrix.translateY + ')';
             element.style.transform = matrixString;
         }
     }
@@ -106,7 +101,7 @@
             let startProperties = {};
             for (let property in desiredProperties) {
                 if (isElement(target) && property === 'transform') {
-                    startProperties[property] = getCssTransform(target)//getCssValue(target, property);
+                    startProperties[property] = getCssTransform(target);
                 }
                 else if (isElement(target) && cssProperties.includes(property)) {
                     let cssValue = getCssValue(target, property);
@@ -136,7 +131,7 @@
                 target : target,
                 startProperties: startProperties,
                 desiredProperties: desiredProperties
-            }
+            };
         }
         function getAnimatables(targets, properties) {
             let animatedTargets = [];
@@ -267,7 +262,7 @@
         }
         return {
             tick : tick
-        }
+        };
     })();
 
     let queuedAnimations = [];
