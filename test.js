@@ -15,15 +15,16 @@ app.controller("HelloController", function($scope, $element, $timeout) {
             }
         });
         lively.animate({
-            targets : '#mydiv1',
+            targets : 'div',
             //x : '50',
-            //height : 20,
+            height : 20,
             //rotate : 360,
+            rotate: 360,
             translateX : -20,
             translateY : 200,
             'border-radius' : 50,
-            //width: 20,
-            //opacity : 0,
+            width: 20,
+            opacity : 0,
             update: function() {
                 // $scope.$apply();
                 console.log('update');
@@ -43,7 +44,6 @@ app.controller("HelloController", function($scope, $element, $timeout) {
     });
 
     $scope.onClick = function () {
-        var node = document.querySelector("div");
         lively.play();
     };
     

@@ -47,30 +47,10 @@
     function setCssTransform(element, matrix) {
         if (isElement(element) && matrix) {
             let matrixString = 'matrix(' + matrix.scaleX + ', ' + matrix.skewX + ', ' + matrix.skewY + ', ' + matrix.scaleY + ', ' + matrix.translateX + ', ' + matrix.translateY + ')';
-            element.style.transform = matrixString;
+            let rotateString = 'rotate(' + (matrix.rotate || 0) + 'deg)';
+            element.style.transform = matrixString + ' ' + rotateString;
         }
     }
-    function getRotationMatrix(rotate) {
-        return {
-            scaleX : Math.cos(rotate),
-            skewX : Math.sin(rotate),
-            skewY : (-Math.sin(rotate)),
-            scaleY : (Math.cos(rotate)),
-            translateX : 0,
-            translateY : 0
-        };
-    }
-    function addMatrix(mat1, mat2) {
-        return {
-            scaleX : mat1.scaleX + mat2.scaleX,
-            skewX: mat1.skewX + mat2.skewX,
-            skewY: mat1.skewY + mat2.skewY,
-            scaleY: mat1.scaleY + mat2.scaleY,
-            translateX : mat1.translateX + mat2.translateX,
-            translateY : mat1.translateY + mat2.translateY,
-        };
-    }
-
     function getCssTransform(element) {
         if (isElement(element)) {
             let matrixString = getCssValue(element, 'transform');
@@ -83,6 +63,7 @@
                 scaleY : parseFloat(matrixValues[3]),
                 translateX : parseFloat(matrixValues[4]),
                 translateY : parseFloat(matrixValues[5]),
+                rotate : Math.round(Math.atan2(parseFloat(matrixValues[1]), parseFloat(matrixValues[0])) * 180/Math.PI)
             };
         }
     }
@@ -115,7 +96,6 @@
 
             }
             if (desiredProperties.transform) {
-                let rotationMatrix = getRotationMatrix(desiredProperties.transform.rotate);
                 let finalMatrix = {
                     scaleX : !desiredProperties.transform.scaleX ? startProperties.transform.scaleX : desiredProperties.transform.scaleX,
                     skewY : !desiredProperties.transform.skewY ? startProperties.transform.skewY : desiredProperties.transform.skewY,
@@ -123,6 +103,7 @@
                     scaleY : !desiredProperties.transform.scaleY ? startProperties.transform.scaleY : desiredProperties.transform.scaleY,
                     translateX : !desiredProperties.transform.translateX ? startProperties.transform.translateX : desiredProperties.transform.translateX,
                     translateY : !desiredProperties.transform.translateY ? startProperties.transform.translateY : desiredProperties.transform.translateY,
+                    rotate : desiredProperties.transform.rotate || 0
                 };
                 //desiredProperties.transform = addMatrix(finalMatrix, rotationMatrix);
                 desiredProperties.transform = finalMatrix;
@@ -278,7 +259,7 @@
 
     const animationEngine = (() => {
 
-        let renderer = animator.tick;//rendererFactory.createRenderer();
+        let renderer = animator.tick;
         let startTime = 0;
         let elapsedTime = 0;
         let pauseTime = 0;
