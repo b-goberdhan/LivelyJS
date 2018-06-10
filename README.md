@@ -15,7 +15,10 @@ This library provides a means to easily and seamlessly add animation on to your 
 **Features**:
  - Can animate css styling such as `border-radius`, `width`, `height`, `opacity` etc.
  - Can animate css translates which includes: `rotate`, `translateX`, `translateY`, `scaleX`, `scaleY`, `skewX`, `skewY` . 
- - Coming soon in v2.2.0: Animating color.
+
+## Coming soon in v2.2.0: 
+ - Animating color
+ - Adding custom easing
 
  
 
@@ -70,4 +73,52 @@ animateObj looks like this:
 	    border-radius: 50,
 	    width : 20 
     }
- 
+
+## Playing animations:
+Use the `lively.play()`function to start an animation. 
+This will play all animateObjs that you have included. For example :
+
+    lively.animate(animateObj1, 200);
+    lively.animate(animateObj2, 1000);
+    lively.play(); // this will start both of the included animations.
+
+## Pausing animations: 
+Use the `lively.pause()` function to pause **all** animations
+## Stoping animations:
+Use the `lively.stop()` function to pause **all** animation.
+
+## Preserve
+When livelyjs runs animation from `lively.play()`, after the completion of an animation the provided animateObj will automatically discarded, which means that if you clicked play again, nothing would happen! Preserving the animateObj will ensure that after your animation has completed that invoking `play()` again will restart the animation.
+`preserve` : this is used to prevent livelyjs from discarding the animateObj after the animation has completed being run.
+
+## Easings
+
+`eases` : this is used to specify what easing function is being used during the animation. Currently there are 4 build in easing functions: 
+ - `"default"` A basic linear ease
+ - `"easeInQuad"`
+ - `"easeOutQuad"`
+ - `"easeInOutQuad"`
+
+Example of using eases  using build in easing functions:
+    
+    targets: "myDiv"
+    translateX : 50
+    border-radius: 50,
+    width : 20 
+    eases : "easeInOutQuad"
+        
+Example of using eases to specify custom easing using a function:
+    
+    targets: "myDiv"
+    translateX : 50
+    border-radius: 50,
+    width : 20 
+    eases : function(currentTime, initialValue, changeInValue, duration) { }
+
+Example of using eases to specify easing for  properties:
+    
+    targets: "myDiv"
+    translateX : 50
+    border-radius: 50,
+    width : 20 
+    eases : [{ width : 'easeInOutQuad' }, { border-radius : 'easeInQuad'}]
