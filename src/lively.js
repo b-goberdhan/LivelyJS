@@ -1,7 +1,6 @@
 (function (context, configure) {
     context.lively = configure();
 }(this, () => {
-
     // Easing functions
     const easings = {
         'default' :  (currentTime, initialValue, changeInValue, duration) => {
@@ -79,7 +78,7 @@
                     r : parseInt(rgb[1]),
                     g : parseInt(rgb[2]),
                     b : parseInt(rgb[3])
-                }
+                };
             }
         }
         else if (color.startsWith('#') && color.length === 4) {
