@@ -16,9 +16,10 @@ This library provides a means to easily and seamlessly add animation on to your 
  - Can animate css styling such as `border-radius`, `width`, `height`, `opacity` etc.
  - Can animate css translates which includes: `rotate`, `translateX`, `translateY`, `scaleX`, `scaleY`, `skewX`, `skewY` . 
 
-## Coming soon in v2.2.0: 
+## New in in v2.1.0: 
  - Animating color
- - Adding custom easing
+ - Adding custom easing functions
+ - Have easing per property.
 
  
 
