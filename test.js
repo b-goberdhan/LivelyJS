@@ -17,28 +17,20 @@ app.controller("HelloController", function($scope, $element, $timeout) {
         lively.animate({
             targets : 'div',
             //x : '50',
-            height : 20,
-            //rotate : 360,
+            //height : 20,
+            'background-color': '#ff9679',
+            scaleX : .25,
+            scaleY : 0.25,
             rotate: 360,
             translateX : -20,
             translateY : 200,
             'border-radius' : 50,
-            width: 20,
-            opacity : 0,
+            //width: 20,
+            //opacity : 0,
             update: function() {
-                // $scope.$apply();
-                console.log('update');
             },
             eases : 'easeOutQuad',
             preserve : true,
-            done : function () { console.log('done'); },
-        }, 2000);
-        lively.animate({
-            targets : $scope.obj1,
-            x : 100,
-            done : function () {
-                console.log('done2');
-            }
         }, 2000);
 
     });

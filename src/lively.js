@@ -1,31 +1,29 @@
 (function (context, configure) {
-
     context.lively = configure();
 }(this, () => {
 
     // Easing functions
     const easings = {
-        default :  (currentTime, initialValue, changeInValue, duration) => {
+        'default' :  (currentTime, initialValue, changeInValue, duration) => {
             return changeInValue * (currentTime / duration) + initialValue;
         },
-        easeInQuad : (currentTime, initialValue, changeInValue, duration) => {
+        'easeInQuad' : (currentTime, initialValue, changeInValue, duration) => {
             return changeInValue*(currentTime/=duration)*currentTime + initialValue;
         },
-        easeOutQuad : (t, b, c, d) => {
+        'easeOutQuad' : (t, b, c, d) => {
             return -c * (t/=d)*(t-2) + b;
         },
-        easeInOutQuad: function (t, b, c, d) {
+        'easeInOutQuad': function (t, b, c, d) {
             if ((t/=d/2) < 1) return c/2*t*t + b;
             return -c/2 * ((--t)*(t-2) - 1) + b;
         },
         
     };
-
-    const reservedAnimatableProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
-    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'border-radius'];
-
     // NEW CSS STUFF
+    const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
     const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
+    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'border-radius'];
+    const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
     function isElement(object) {
         return (object instanceof Element);
     }
@@ -39,9 +37,7 @@
     }
     function getCssValue(element, property) {
         if (isElement(element)) {
-            let styleValue = getComputedStyle(element).getPropertyValue(property);
-            if (property === 'transform') return styleValue;
-            return styleValue;
+            return getComputedStyle(element).getPropertyValue(property);
         }
     }
     function setCssTransform(element, matrix) {
@@ -75,6 +71,49 @@
             else return '';
         }
     }
+    function parseColor(color) {
+        if (color.startsWith('rgb(')) {
+            let rgb = color.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+            if (rgb) {
+                return {
+                    r : parseInt(rgb[1]),
+                    g : parseInt(rgb[2]),
+                    b : parseInt(rgb[3])
+                }
+            }
+        }
+        else if (color.startsWith('#') && color.length === 4) {
+            let rgb = color.match(/^#([0-9a-f]{3})$/i)[1];
+            if (rgb) {
+                return {
+                    r : parseInt(rgb.charAt(0), 16) * 0x11,
+                    g : parseInt(rgb.charAt(1), 16) * 0x11,
+                    b : parseInt(rgb.charAt(2), 16) * 0x11,
+                };
+            }
+        }
+        else if (color.startsWith('#') && color.length === 7) {
+            let rgb = color.match(/^#([0-9a-f]{6})$/i)[1];
+            if (rgb) {
+                return {
+                    r : parseInt(rgb.substr(0,2), 16),
+                    g : parseInt(rgb.substr(2,2), 16),
+                    b : parseInt(rgb.substr(4,2), 16),
+                };
+            }
+        }
+    }
+    function getRgbValue(element, property) {
+        if (isElement(element) && cssColorProperties.includes(property)) {
+            let colorString = getCssValue(element, property);
+            return parseColor(colorString);
+        }
+    }
+    function setRgbValue(element, property, rgb) {
+        if (isElement(element)) {
+            element.style[property] = 'rgb(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ')';
+        }
+    }
     // Animation related constants
     const animationFactory = (() => {
         let factory = {};
@@ -83,6 +122,9 @@
             for (let property in desiredProperties) {
                 if (isElement(target) && property === 'transform') {
                     startProperties[property] = getCssTransform(target);
+                }
+                else if (isElement(target) && cssColorProperties.includes(property)) {
+                    startProperties[property] = getRgbValue(target, property);
                 }
                 else if (isElement(target) && cssProperties.includes(property)) {
                     let cssValue = getCssValue(target, property);
@@ -96,7 +138,7 @@
 
             }
             if (desiredProperties.transform) {
-                let finalMatrix = {
+                desiredProperties.transform = {
                     scaleX : !desiredProperties.transform.scaleX ? startProperties.transform.scaleX : desiredProperties.transform.scaleX,
                     skewY : !desiredProperties.transform.skewY ? startProperties.transform.skewY : desiredProperties.transform.skewY,
                     skewX : !desiredProperties.transform.skewX ? startProperties.transform.skewX : desiredProperties.transform.skewX,
@@ -105,8 +147,6 @@
                     translateY : !desiredProperties.transform.translateY ? startProperties.transform.translateY : desiredProperties.transform.translateY,
                     rotate : desiredProperties.transform.rotate || 0
                 };
-                //desiredProperties.transform = addMatrix(finalMatrix, rotationMatrix);
-                desiredProperties.transform = finalMatrix;
             }
             return {
                 target : target,
@@ -135,12 +175,15 @@
         function getProperties(animatable) {
             let desiredPropertyValues = {};
             for (let property in animatable) {
-                if (!reservedAnimatableProperties.includes(property)) {
+                if (!livelyProperties.includes(property)) {
                     if (cssTransformProperties.includes(property)) {
                         if (!desiredPropertyValues.transform) {
                             desiredPropertyValues.transform = { };
                         }
                         desiredPropertyValues.transform[property] = animatable[property];
+                    }
+                    else if (cssColorProperties.includes(property)) {
+                        desiredPropertyValues[property] = parseColor(animatable[property]);
                     }
                     else {
                         desiredPropertyValues[property] = animatable[property];  
@@ -152,7 +195,7 @@
         }
         function getEases(eases) {
             let animationEases = {
-                default : easings.default
+                'default' : easings.default
             };
             if (typeof eases === 'function') {
                 animationEases.default = eases;
@@ -197,7 +240,19 @@
             }
 
             setCssTransform(target, currentMatrix);
-
+        }
+        function tickCssColor(currentTime, duration, animatable, property, tween) {
+            let target = animatable.target;
+            let startColors = animatable.startProperties[property];
+            let desiredColors = animatable.desiredProperties[property];
+            let currentValue = {};
+            for (let color in desiredColors) {
+                let startColor = startColors[color];
+                let changeInVal = desiredColors[color] - startColor;
+                if (currentTime >= duration) currentValue[property] = desiredColors[color];
+                else currentValue[color] = tween(currentTime, startColor, changeInVal, duration);
+            }
+            setRgbValue(target, property, currentValue);
         }
         function tickCssStyle(currentTime, duration, animatable, property, tween) {
             let unit = getCssUnit(animatable.target, property);
@@ -230,6 +285,9 @@
                     let tween = easings[tweenName];
                     if (isElement(animatable.target) && property === 'transform') {
                         tickCssTransform(currentTime, duration, animatable, tween);
+                    }
+                    else if (isElement(animatable.target) && cssColorProperties.includes(property)) {
+                        tickCssColor(currentTime, duration, animatable, property, tween);
                     }
                     else if (isElement(animatable.target)) {
                         tickCssStyle(currentTime, duration, animatable, property, tween);
@@ -284,7 +342,6 @@
             }
         }
         function reset() {
-            renderer = rendererFactory.createRenderer();
             startTime = undefined;
             elapsedTime = undefined;
             isPaused = false;
@@ -335,8 +392,6 @@
                     config.onAllAnimationsComplete();
                 }
             }
-            
-            
         }
         return {
             play : play,
@@ -346,7 +401,6 @@
         };
     })();
 
-    
     lively.reset = () => {
         queuedAnimations = [];
         finishedAnimations = [];
