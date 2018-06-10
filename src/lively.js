@@ -23,7 +23,6 @@
     // NEW CSS STUFF
     const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
     const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
-    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'border-radius'];
     const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
     function isElement(object) {
         return (object instanceof Element);
@@ -127,7 +126,7 @@
                 else if (isElement(target) && cssColorProperties.includes(property)) {
                     startProperties[property] = getRgbValue(target, property);
                 }
-                else if (isElement(target) && cssProperties.includes(property)) {
+                else if (isElement(target)) {
                     let cssValue = getCssValue(target, property);
                     let unit = getCssUnit(target,property);
                     if (unit !== '') startProperties[property] = parseFloat(cssValue.substring(0, cssValue.indexOf(unit)));
@@ -350,6 +349,7 @@
             startTime = undefined;
             elapsedTime = 0;
             pauseTime = 0;
+            raf = 0;
             if (finishedAnimations.length) {
                 queuedAnimations = [].concat(finishedAnimations);
                 finishedAnimations = [];
@@ -359,6 +359,7 @@
             startTime = undefined;
             elapsedTime = undefined;
             isPaused = false;
+            raf = 0;
         }
         function renderAnimations(elapsedTime) {
             for (let i = 0; i < queuedAnimations.length; i++) {
