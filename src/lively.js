@@ -18,6 +18,8 @@
         },
         
     };
+    let customEasings = {};
+
     // NEW CSS STUFF
     const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
     const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
@@ -199,13 +201,19 @@
             if (typeof eases === 'function') {
                 animationEases.default = eases;
             }
-            else if (typeof eases === 'string') {
+            else if (typeof eases === 'string' && (eases in easings)) {
                 animationEases.default = easings[eases];
+            }
+            else if (typeof eases === 'string' && (eases in customEasings)) {
+                animationEases.default = customEasings[eases];
             }
             else if (eases && eases.length) {
                 for (let i = 0; i < eases.length; i++) {
                     for (let property in eases[i]) {
-                        animationEases[property] = eases[i][property];
+                        if ((typeof eases[i][property] === 'string') && (eases[i][property] in easings) || (eases[i][property] in customEasings)) {
+                            let easingName = eases[i][property];
+                            animationEases[property] = easings[easingName] || customEasings[easingName];
+                        }
                         break;
                     }
                 }
@@ -280,8 +288,8 @@
                 let desiredProperties = animatable.desiredProperties;
                 // Iterate through all properties to be animated in the animatable
                 for (let property in desiredProperties) {
-                    let tweenName = (animation.eases[property]) ? animation.eases[property] : 'default';
-                    let tween = easings[tweenName];
+                    let tweenName = (animation.eases[property]) ? property : 'default';
+                    let tween = animation.eases[tweenName];
                     if (isElement(animatable.target) && property === 'transform') {
                         tickCssTransform(currentTime, duration, animatable, tween);
                     }
@@ -405,7 +413,7 @@
         finishedAnimations = [];
         animationEngine.reset();
     };
-    lively.easings = easings;
+    lively.easings = customEasings;
     lively.animate = (animateObj, durationMs) => {
         let animation = animationFactory.createAnimation(animateObj, durationMs);
         queuedAnimations.push(animation);
