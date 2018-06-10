@@ -123,3 +123,24 @@ Example of using eases to specify easing for  properties:
     border-radius: 50,
     width : 20 
     eases : [{ width : 'easeInOutQuad' }, { border-radius : 'easeInQuad'}]
+    
+**You can also add custom easing functions**:
+
+To add custom easing:
+
+    lively.easing['myCustomEasing'] = function (t, b, c, d) { //easing logic };
+    // t = currentTime
+    // b = startingValue
+    // c = change in value
+    // d = duration
+
+Then use it:
+
+     lively.animate({
+    	    targets: "myDiv"
+    	    translateX : 50
+    	    border-radius: 50,
+    	    width : 20 
+    	    eases : [{ width : 'myCustomEasing' }, { border-radius : 'easeInQuad'}]
+    	})
+
