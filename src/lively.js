@@ -233,13 +233,16 @@
         return factory;
     })();
     const animator = (() => {
-        function tickCssTransform(currentTime, duration, animatable, tween) {
+        function tickCssTransform(currentTime, duration, animatable, eases) {
             let target = animatable.target;
             let desiredTransforms = animatable.desiredProperties.transform;
             let startingProperties = animatable.startProperties.transform;
             let currentMatrix = {};
 
             for (let property in desiredTransforms) {
+                let tweenName = (eases[property]) ? property : 'default';
+                let tween = eases[tweenName];
+
                 let startVal = startingProperties[property];
                 let changeInVal = desiredTransforms[property] - startVal;
                 if (currentTime >= duration) currentMatrix[property] = desiredTransforms[property];
@@ -248,7 +251,9 @@
 
             setCssTransform(target, currentMatrix);
         }
-        function tickCssColor(currentTime, duration, animatable, property, tween) {
+        function tickCssColor(currentTime, duration, animatable, property, eases) {
+            let tweenName = (eases[property]) ? property : 'default';
+            let tween = eases[tweenName];
             let target = animatable.target;
             let startColors = animatable.startProperties[property];
             let desiredColors = animatable.desiredProperties[property];
@@ -261,7 +266,9 @@
             }
             setRgbValue(target, property, currentValue);
         }
-        function tickCssStyle(currentTime, duration, animatable, property, tween) {
+        function tickCssStyle(currentTime, duration, animatable, property, eases) {
+            let tweenName = (eases[property]) ? property : 'default';
+            let tween = eases[tweenName];
             let unit = getCssUnit(animatable.target, property);
             let startValue = parseFloat(animatable.startProperties[property]);
             let currentValue;
@@ -270,7 +277,9 @@
             else currentValue = tween(currentTime, startValue, (desiredValue - startValue), duration);
             setCssValue(animatable.target, property, currentValue + unit);
         }
-        function tickObject(currentTime, duration, animatable, property, tween) {
+        function tickObject(currentTime, duration, animatable, property, eases) {
+            let tweenName = (eases[property]) ? property : 'default';
+            let tween = eases[tweenName];
             let target = animatable.target;
             let startValue = animatable.startProperties[property];
             let currentValue;
@@ -288,19 +297,17 @@
                 let desiredProperties = animatable.desiredProperties;
                 // Iterate through all properties to be animated in the animatable
                 for (let property in desiredProperties) {
-                    let tweenName = (animation.eases[property]) ? property : 'default';
-                    let tween = animation.eases[tweenName];
                     if (isElement(animatable.target) && property === 'transform') {
-                        tickCssTransform(currentTime, duration, animatable, tween);
+                        tickCssTransform(currentTime, duration, animatable, animation.eases);
                     }
                     else if (isElement(animatable.target) && cssColorProperties.includes(property)) {
-                        tickCssColor(currentTime, duration, animatable, property, tween);
+                        tickCssColor(currentTime, duration, animatable, property, animation.eases);
                     }
                     else if (isElement(animatable.target)) {
-                        tickCssStyle(currentTime, duration, animatable, property, tween);
+                        tickCssStyle(currentTime, duration, animatable, property, animation.eases);
                     }
                     else if (isObject(animatable.target)) {
-                        tickObject(currentTime, duration, animatable, property, tween);
+                        tickObject(currentTime, duration, animatable, property, animation.eases);
                     }
                 }
             }
