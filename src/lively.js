@@ -27,7 +27,7 @@
     }
     // NEW CSS STUFF
     const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve', 'keyframes'];
-    const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
+    const cssTransformProperties = ['transform', 'translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
     const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
     function isElement(object) {
         return (object instanceof Element);
@@ -35,9 +35,11 @@
     function isObject(object) {
         return (object instanceof Object);
     }
-    function parseValue(value) {
+    function parseValue(value, property) {
         let result = parseColor(value);
         if (result) return result;
+        result = parseTransform(value, property);
+        if (result !== undefined && !isNaN(result)) return result;
         result = parseFloat(parseCssValue(value));
         if (result !== undefined && !isNaN(result)) return result;
         return value;
@@ -45,6 +47,22 @@
     function parseCssValue(value) {
         if (typeof value !== 'string') return undefined;
         return value.replace(/[^0-9]/g, '');
+    }
+    function parseTransform(value, property) {
+        if (!property || !cssTransformProperties.includes(property)) return undefined;
+        let matrixValues;
+        if (value === 'none') value = 'matrix(1,0,0,1,0,0)';
+        matrixValues = value.match(/\(([^()])+\)/)[0].match(/[^()]+/)[0].split(',');
+        let transform = {
+            scaleX : parseFloat(matrixValues[0]),
+            skewY : parseFloat(matrixValues[1]),
+            skewX : parseFloat(matrixValues[2]),
+            scaleY : parseFloat(matrixValues[3]),
+            translateX : parseFloat(matrixValues[4]),
+            translateY : parseFloat(matrixValues[5]),
+            rotate : Math.round(Math.atan2(parseFloat(matrixValues[1]), parseFloat(matrixValues[0])) * 180/Math.PI)
+        };
+        return transform[property];
     }
     function parseColor(color) {
         if (typeof color !== 'string') return undefined;
@@ -110,12 +128,18 @@
         return target[property];
     }
     function getCssValue(element, property) {
-        if (isElement(element)) {
+        if (isElement(element) && cssTransformProperties.includes(property)) {
+            return getComputedStyle(element).getPropertyValue('transform');
+        }
+        else if (isElement(element)) {
             return getComputedStyle(element).getPropertyValue(property);
         }
     }
     function setTargetPropertyValue(target, property, value) {
-        if (isElement(target) && cssColorProperties.includes(property)) {
+        if (isElement(target) && cssTransformProperties.includes(property)) {
+            setTransformValue(target, property, value);
+        }
+        else if (isElement(target) && cssColorProperties.includes(property)) {
             setRgbValue(target, property, value);
         }
         else if (isElement(target)) {
@@ -130,7 +154,23 @@
             element.style[property] = 'rgb(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ')';
         }
     }
+    function setTransformValue(element, property, transform) {
+        if (isElement(element)) {
+            let scaleX = !transform.scaleX ? 1 : transform.scaleX;
+            let skewY = !transform.skewY ? 0 : transform.skewY;
+            let skewX = !transform.skewX ? 0 : transform.skewX;
+            let scaleY = !transform.scaleY ? 1 : transform.scaleY;
+            let translateX = !transform.translateX ? 0 : transform.translateX;
+            let translateY = !transform.translateY ? 0 : transform.translateY;
+            let rotate = !transform.rotate ? 0 : transform.rotate;
+            let matrixString = 'matrix(' + scaleX + ', ' + skewX + ', ' + skewY + ', ' + scaleY + ', ' + translateX + ', ' + translateY + ')';
+            let rotateString = 'rotate(' + rotate + 'deg)';
+            element.style['transform'] = matrixString + ' ' + rotateString;
+        }
 
+
+
+    }
     // Animation related constants
     const animationFactory = (() => {
         let factory = {};
@@ -194,53 +234,62 @@
             }
             return animatedTargets;
         }
-        function addKeyframe(duration, target, property, keyframes, frame) {
+
+        function parseKeyframes(duration, target, animateObj, property, propertyKeyframes) {
+            if (!livelyProperties.includes(property)) {
+                if (typeof animateObj[property] !== 'string' && animateObj[property].length) {
+                    propertyKeyframes[property] = [];
+                    for (let i = 0; i < animateObj[property].length; i++) {
+                        let frame = animateObj[property][i];
+                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
+                        propertyKeyframes[property].sort(function (a, b) {
+                            return a.startTime > b.startTime;
+                        });
+                    }
+                    propertyKeyframes[property][0].startTime = 0;
+                    // If we have multiple keyframes, we set the start time and start value
+                    // of future keyframes to be the endTime and endValue of previous keyframes
+                    for (let i = 1; i < propertyKeyframes[property].length; i++) {
+                        propertyKeyframes[property][i].startTime = propertyKeyframes[property][i - 1].endTime;
+                        propertyKeyframes[property][i].startValue = propertyKeyframes[property][i - 1].endValue;
+                    }
+                    let length = propertyKeyframes[property].length;
+                    // Set the isLast value for the property keyframes
+                    propertyKeyframes[property][length - 1].isLast = true;
+                }
+                else if (isObject(animateObj[property])) {
+                    propertyKeyframes[property] = [];
+                    let frame = animateObj[property];
+                    let isLast = true;
+                    addKeyframe(duration, target, property, propertyKeyframes[property], frame, isLast);
+                }
+                else {
+                    propertyKeyframes[property] = [];
+                    let value = animateObj[property];
+                    let frame = {'100%' : value};
+                    let isLast = true;
+                    addKeyframe(duration, target, property, propertyKeyframes[property], frame, isLast);
+                }
+            }
+        }
+        function addKeyframe(duration, target, property, keyframes, frame, isLast) {
             let percentComplete = getFirstKey(frame),
                 endTime = (parsePercentage(percentComplete) / 100) * duration,
-                startVal = parseValue(getTargetValue(target, property));
+                startVal = parseValue(getTargetValue(target, property), property);
             keyframes.push({
                 startTime : 0,
                 startValue : startVal,
                 endTime : endTime,
                 endValue : parseValue(frame[percentComplete]),
-                unit : parseUnit(target, property, frame[percentComplete])
+                unit : parseUnit(target, property, frame[percentComplete]),
+                isLast : isLast
             });
         }
         function getKeyframes(animateObj, duration, target) {
             let propertyKeyframes = {};
             for (let property in animateObj) {
                 if (!livelyProperties.includes(property)) {
-                    if (typeof animateObj[property] !== 'string' && animateObj[property].length) {
-                        propertyKeyframes[property] = [];
-                        for (let i = 0; i < animateObj[property].length; i++) {
-                            let frame = animateObj[property][i];
-                            addKeyframe(duration, target, property, propertyKeyframes[property], frame);
-                            propertyKeyframes[property].sort(function (a, b) {
-                                return a.startTime > b.startTime;
-                            });
-                        }
-                        propertyKeyframes[property][0].startTime = 0;
-                        // If we have multiple keyframes, we set the start time and start value
-                        // of future keyframes to be the endTime and endValue of previous keyframes
-                        for (let i = 1; i < propertyKeyframes[property].length; i++) {
-                            propertyKeyframes[property][i].startTime = propertyKeyframes[property][i - 1].endTime;
-                            propertyKeyframes[property][i].startValue = propertyKeyframes[property][i - 1].endValue;
-                        }
-                        let length = propertyKeyframes[property].length;
-                        // Set the isLast value for the property keyframes
-                        propertyKeyframes[property][length - 1].isLast = true;
-                    }
-                    else if (isObject(animateObj[property])) {
-                        propertyKeyframes[property] = [];
-                        let frame = animateObj[property];
-                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
-                    }
-                    else {
-                        propertyKeyframes[property] = [];
-                        let value = animateObj[property];
-                        let frame = {'100%' : value};
-                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
-                    }
+                    parseKeyframes(duration, target, animateObj, property, propertyKeyframes);
                 }
             }
             return propertyKeyframes;
@@ -273,9 +322,6 @@
             if (keyframe.isLast && currentTime >= keyframe.endTime) {
                 return keyframe.endValue;
             }
-            else if (isElement(target) && cssTransformProperties.includes(property)) {
-
-            }
             else if (isElement(target) && cssColorProperties.includes(property)) {
                 return {
                     r : tween((currentTime - keyframe.startTime), keyframe.startValue.r, (keyframe.endValue.r - keyframe.startValue.r), (keyframe.endTime - keyframe.startTime)),
@@ -296,12 +342,17 @@
                 let target = animation.targets[i].target;
                 let keyframeProperties = animation.targets[i].keyframes;
 
+                let transform = {};
                 for (let property in keyframeProperties) {
                     let tween = getTween(eases, property);
                     let keyframe = getKeyframe(currentTime, keyframeProperties[property]);
                     let currentVal = animateKeyframe(currentTime, target, property, keyframe, tween);
-                    if (keyframe.unit) setTargetPropertyValue(target, property, currentVal + keyframe.unit);
+                    if (keyframe.unit) currentVal = currentVal + keyframe.unit;
+                    if (cssTransformProperties.includes(property)) transform[property] = currentVal;
                     else setTargetPropertyValue(target, property, currentVal);
+                }
+                if (transform !== {}) {
+                    setTargetPropertyValue(target, 'transform', transform);
                 }
             }
             return finished;
