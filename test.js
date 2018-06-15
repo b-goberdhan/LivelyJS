@@ -19,20 +19,19 @@ window.onload = function () {
         targets : 'div',
         //srotate : 360 ,
         //translateX : [{ '20%' : 20}, {'60%' : 200 }],
-        'opacity' : [{ '25%' : .1}, { '50%' : 1}, { '75%' : .5}],
-        //'background-color': 'rgb(0, 56, 200)',
-        //'font-size' : { '100%' : 50 },
-
-        //'border-radius' : [{ '100%': 50 }],
-/*
+        'opacity' : [{ '25%' : 0.1}, { '50%' : 1}, { '75%' : .5}, {'100%' : 1}],
+        'background-color':  [{ '20%' : '#2345ff'}, { '50%' : '#22ff3c'}, { '100%' : '#ffcf21' }],
+        'font-size' : [{ '100%' : 50 }],
+        //'background-color' : '#000',
+        'border-radius' : '50%' ,
         eases : [
             //{ translateX: 'bounce'},
             //{ rotate: 'bounce'},
-            //{'border-radius': 'default'}
+            {'font-size': 'bounce'}
         ],
-        */
+
         preserve : true
-    }, 5000);
+    }, 10000);
     document.getElementById('mydiv1').onclick = function() {
         lively.play();
     };
