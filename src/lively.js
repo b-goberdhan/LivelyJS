@@ -44,9 +44,7 @@
     }
     function parseCssValue(value) {
         if (typeof value !== 'string') return undefined;
-        let x = value.replace(/[^0-9]/g, '');
-        console.log(x);
-        return x;
+        return value.replace(/[^0-9]/g, '');
     }
     function parseColor(color) {
         if (typeof color !== 'string') return undefined;
@@ -196,25 +194,27 @@
             }
             return animatedTargets;
         }
+        function addKeyframe(duration, target, property, keyframes, frame) {
+            let percentComplete = getFirstKey(frame),
+                endTime = (parsePercentage(percentComplete) / 100) * duration,
+                startVal = parseValue(getTargetValue(target, property));
+            keyframes.push({
+                startTime : 0,
+                startValue : startVal,
+                endTime : endTime,
+                endValue : parseValue(frame[percentComplete]),
+                unit : parseUnit(target, property, frame[percentComplete])
+            });
+        }
         function getKeyframes(animateObj, duration, target) {
             let propertyKeyframes = {};
             for (let property in animateObj) {
                 if (!livelyProperties.includes(property)) {
                     if (typeof animateObj[property] !== 'string' && animateObj[property].length) {
-
                         propertyKeyframes[property] = [];
                         for (let i = 0; i < animateObj[property].length; i++) {
                             let frame = animateObj[property][i];
-                            let percentComplete = getFirstKey(frame);
-                            let endTime = (parsePercentage(percentComplete) / 100) * duration;
-                            let startVal = (i === 0) ? parseValue(getTargetValue(target, property)) : undefined;
-                            propertyKeyframes[property].push({
-                                startTime : undefined,
-                                startValue : startVal,
-                                endTime : endTime,
-                                endValue : parseValue(frame[percentComplete]),
-                                unit : parseUnit(target, property, frame[percentComplete]),
-                            });
+                            addKeyframe(duration, target, property, propertyKeyframes[property], frame);
                             propertyKeyframes[property].sort(function (a, b) {
                                 return a.startTime > b.startTime;
                             });
@@ -227,34 +227,19 @@
                             propertyKeyframes[property][i].startValue = propertyKeyframes[property][i - 1].endValue;
                         }
                         let length = propertyKeyframes[property].length;
+                        // Set the isLast value for the property keyframes
                         propertyKeyframes[property][length - 1].isLast = true;
-
                     }
                     else if (isObject(animateObj[property])) {
-                        let frame = animateObj[property];
-                        let percentComplete = getFirstKey(frame);
-                        let endTime = (parsePercentage(percentComplete) / 100) * duration;
                         propertyKeyframes[property] = [];
-                        propertyKeyframes[property].push({
-                            startTime : 0,
-                            startValue : parseValue(getTargetValue(target, property)),
-                            endTime : endTime,
-                            endValue : parseValue(frame[percentComplete]),
-                            unit : parseUnit(target, property, frame[percentComplete]),
-                            isLast : true
-                        });
+                        let frame = animateObj[property];
+                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
                     }
                     else {
-                        let value = animateObj[property];
                         propertyKeyframes[property] = [];
-                        propertyKeyframes[property].push({
-                            startTime : 0,
-                            startValue : parseValue(getTargetValue(target, property)),
-                            endTime : duration,
-                            endValue : parseValue(value),
-                            unit : parseUnit(target, property, value),
-                            isLast : true
-                        });
+                        let value = animateObj[property];
+                        let frame = {'100%' : value};
+                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
                     }
                 }
             }
