@@ -20,21 +20,23 @@
     };
     let customEasings = {};
 
+    //Helpers
     function getFirstKey(obj) {
         for (let key in obj) {
             return key;
         }
     }
-    // NEW CSS STUFF
-    const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve', 'keyframes'];
-    const cssTransformProperties = ['transform', 'translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
-    const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
     function isElement(object) {
         return (object instanceof Element);
     }
     function isObject(object) {
         return (object instanceof Object);
     }
+    const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve', 'keyframes'];
+    // CSS Helpers
+    const cssTransformProperties = ['transform', 'translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
+    const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
+
     function parseValue(value, property) {
         let result = parseColor(value);
         if (result) return result;
@@ -333,7 +335,9 @@
         }
         function tick(currentTime, animation) {
             let duration = animation.duration;
-            let finished = (currentTime >= duration);
+            let finished = (currentTime >= duration) || (currentTime < 0);
+            if (currentTime < 0) return finished;
+
             let eases = animation.eases;
             for (let i = 0; i < animation.targets.length; i++) {
                 let target = animation.targets[i].target;
@@ -376,21 +380,30 @@
         let startTime = 0;
         let elapsedTime = 0;
         let pauseTime = 0;
+        let reverseTime = 0;
         let isPaused = false; 
         let isStopped = false;
-
+        let isRewinding = false;
         function play() {
-            isPaused = isStopped = false;
+            isRewinding = isPaused = isStopped = false;
             raf = requestAnimationFrame(tick);
+        }
+        function rewind() {
+            if (!isStopped) {
+                isRewinding = true;
+            }
         }
         function pause() {
             isPaused = true;
+            isRewinding = false;
         }
         function stop() {
             isStopped = true;
+            isRewinding = false;
             startTime = undefined;
             elapsedTime = 0;
             pauseTime = 0;
+            reverseTime = 0;
             raf = 0;
             if (finishedAnimations.length) {
                 queuedAnimations = [].concat(finishedAnimations);
@@ -428,15 +441,22 @@
                 if (!startTime) {
                     startTime = timeStamp;
                 }
-                
+
                 if (isPaused) {
                     pauseTime = (timeStamp - startTime) - elapsedTime;
                     elapsedTime = (timeStamp - startTime) - pauseTime; 
                 }
-                else {
-                    elapsedTime = (timeStamp - startTime) - pauseTime; 
+
+                if (isRewinding) {
+                    let currentTime = (timeStamp - startTime) - pauseTime;
+                    reverseTime = (elapsedTime - (currentTime - elapsedTime));
+                    renderAnimations(reverseTime);
                 }
-                renderAnimations(elapsedTime);
+                else {
+                    elapsedTime = (timeStamp - startTime) - pauseTime;
+                    renderAnimations(elapsedTime - reverseTime);
+                }
+
                 if (config.onRenderTick) {
                     config.onRenderTick();
                 }
@@ -452,6 +472,7 @@
         }
         return {
             play : play,
+            rewind : rewind,
             pause : pause,
             stop : stop,
             reset : reset
@@ -470,6 +491,7 @@
         return queuedAnimations.length - 1;
     };
     lively.play = animationEngine.play;
+    lively.rewind = animationEngine.rewind;
     lively.pause = animationEngine.pause;
     lively.stop = animationEngine.stop;
 

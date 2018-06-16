@@ -17,11 +17,11 @@ window.onload = function () {
     };
     lively.animate({
         targets : 'div',
-        rotate : [{ '20%' : 180 } , { '90%' : 180 }, { '100%': 360}] ,
+        rotate : [{ '20%' : 180 } , { '85%' : 180 }, { '100%': 360}] ,
         translateX : {'100%' : 200 },
         scaleX : [{ '20%' : .5 }, { '100%' : 1}],
         scaleY : [{ '50%' : .5 }, { '100%' : 1}],
-        translateY : [{'10%' : 40 }, { '25%' : -40 }, { '100%' : 40 }],
+        //translateY : [{'10%' : 40 }, { '25%' : -40 }, { '100%' : 40 }],
         'opacity' : [{ '25%' : 0.1}, { '50%' : 1}, { '75%' : .5}, {'100%' : 1}],
         'background-color':  [{ '20%' : '#2345ff'}, { '50%' : '#22ff3c'}, { '100%' : '#ffcf21' }],
         'font-size' : [{ '10%' : '50px' }],
@@ -35,9 +35,18 @@ window.onload = function () {
         ],
 
         preserve : true
-    }, 1000);
+    }, 5000);
     document.getElementById('mydiv1').onclick = function() {
         lively.play();
+        setTimeout(function () {
+            lively.rewind();
+        }, 2000);
+        setTimeout(function () {
+           lively.pause();
+        }, 3000);
+        setTimeout(function () {
+            lively.play();
+        }, 4000);
     };
 };
 
