@@ -165,11 +165,8 @@
             let rotate = !transform.rotate ? 0 : transform.rotate;
             let matrixString = 'matrix(' + scaleX + ', ' + skewX + ', ' + skewY + ', ' + scaleY + ', ' + translateX + ', ' + translateY + ')';
             let rotateString = 'rotate(' + rotate + 'deg)';
-            element.style['transform'] = matrixString + ' ' + rotateString;
+            element.style.transform = matrixString + ' ' + rotateString;
         }
-
-
-
     }
     // Animation related constants
     const animationFactory = (() => {
@@ -327,7 +324,7 @@
                     r : tween((currentTime - keyframe.startTime), keyframe.startValue.r, (keyframe.endValue.r - keyframe.startValue.r), (keyframe.endTime - keyframe.startTime)),
                     g : tween((currentTime - keyframe.startTime), keyframe.startValue.g, (keyframe.endValue.g - keyframe.startValue.g), (keyframe.endTime - keyframe.startTime)),
                     b : tween((currentTime - keyframe.startTime), keyframe.startValue.b, (keyframe.endValue.b - keyframe.startValue.b), (keyframe.endTime - keyframe.startTime)),
-                }
+                };
             }
             else if (isElement(target) || isObject(target)) {
                 return tween((currentTime - keyframe.startTime), keyframe.startValue, (keyframe.endValue - keyframe.startValue), (keyframe.endTime - keyframe.startTime));
