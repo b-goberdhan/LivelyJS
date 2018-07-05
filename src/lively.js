@@ -28,7 +28,9 @@
         dom: a => a instanceof Element,
         svg: a => a instanceof SVGElement,
         obj: a => stringContains(Object.prototype.toString.call(a), 'Object'),
+        empty: a => Object.keys(a).length === 0 || (is.array(a) && a.length === 0),
         array: a => Array.isArray(a),
+        nodeList : a => stringContains(Object.prototype.toString.call(a), 'NodeList'),
         str: a => typeof a === 'string',
         und: a => a === undefined,
         fnc: a => typeof a === 'function',
@@ -60,10 +62,7 @@
     }
     function parseTransform(value, property) {
         if (!property || !cssTransformProperties.includes(property)) return undefined;
-
-
         let currentTransform = {};
-
         let match;
         let regex = /(\w+)\(([^)]*)\)/g;
         while ((match = regex.exec(value)) !== null) {
@@ -107,10 +106,9 @@
             }
         }
     }
-    function parsePercentage(percentage) {
-        if (percentage.endsWith('%')) {
-            return parseInt(percentage.replace('%', ''));
-        }
+
+    function parsePercentage(str) {
+        if (str.endsWith('%')) return parseFloat(str.replace('%', ''));
     }
     function parseUnit(target, property, value) {
         if (!is.dom(target)) return undefined;
@@ -202,99 +200,90 @@
             }
             return animationEases;
         }
-        function getTargets(animateObj, duration) {
+        function getKeyframes(animatedProperties, duration, target) {
+            let propertyKeyframes = {};
+            for (let propertyName in animatedProperties) {
+                let keyframes = [];
+                let animatedProperty = animatedProperties[propertyName];
+
+                if (!is.obj(animatedProperty) && !is.array(animatedProperty) && !is.nodeList(animatedProperty)) {
+                    keyframes.push({
+                        startTime : 0,
+                        startValue : parseValue(getTargetValue(target, propertyName), propertyName),
+                        endTime : duration,
+                        endValue : parseValue(animatedProperty),
+                        unit : parseUnit(target, propertyName, animatedProperty),
+                        isLast : true
+                    });
+                }
+                else {
+                    if (is.obj(animatedProperty)) {
+                        animatedProperty = [].concat(animatedProperty);
+                    }
+                    for (let i = 0; i < animatedProperty.length; i++) {
+
+                        let key = getFirstKey(animatedProperty[i]);
+                        let endTime = (parsePercentage(key) / 100) * duration;
+                        keyframes.push({
+                            startTime : 0,
+                            startValue : parseValue(getTargetValue(target, propertyName), propertyName),
+                            endTime : endTime,
+                            endValue : parseValue(animatedProperty[i][key]),
+                            unit : parseUnit(target, propertyName, animatedProperty[i][key]),
+                            isLast : false
+                        });
+                    }
+                    keyframes.sort((a, b) => {
+                        return a.startTime > b.startTime;
+                    });
+                    keyframes[keyframes.length - 1].isLast = true;
+
+                    for (let i = 1; i < keyframes.length; i++) {
+                        keyframes[i].startTime = keyframes[i - 1].endTime;
+                        keyframes[i].startValue = keyframes[i - 1].endValue;
+                    }
+
+                }
+                propertyKeyframes[propertyName] = keyframes;
+
+            }
+            return propertyKeyframes;
+        }
+        function getTargets(animateObj, duration){
             let targets = animateObj.targets;
             let animatedTargets = [];
-            let properties = [];
+            let animatedProperties = {};
+
             for (let property in animateObj) {
                 if (!livelyProperties.includes(property)) {
-                    properties.push(property);
+                    animatedProperties[property] = animateObj[property];
                 }
             }
+
             if (is.str(targets)) {
                 let createdTargets = document.querySelectorAll(targets);
                 for (let i = 0; i < createdTargets.length; i++) {
                     animatedTargets.push({
                         target : createdTargets[i],
-                        keyframes : getKeyframes(animateObj, duration, createdTargets[i])
+                        keyframes : getKeyframes(animatedProperties, duration, createdTargets[i])
                     });
                 }
             }
-            else if (is.array(targets)) {
+            else if (is.array(targets) || is.nodeList(targets)) {
                 for (let i = 0; i < targets.length; i++) {
                     animatedTargets.push({
                         target : targets[i],
-                        keyframes: getKeyframes(animateObj, duration, targets[i])
+                        keyframes: getKeyframes(animatedProperties, duration, targets[i])
                     });
                 }
             }
-            else if (targets) {
+            else if (is.obj(targets)) {
                 animatedTargets.push({
                     target : targets,
-                    keyframes : getKeyframes(animateObj, duration, targets)
+                    keyframes : getKeyframes(animatedProperties, duration, targets)
                 });
             }
             return animatedTargets;
-        }
-
-        function parseKeyframes(duration, target, animateObj, property, propertyKeyframes) {
-            if (!livelyProperties.includes(property)) {
-                if (is.array(animateObj[property])) {
-                    propertyKeyframes[property] = [];
-                    for (let i = 0; i < animateObj[property].length; i++) {
-                        let frame = animateObj[property][i];
-                        addKeyframe(duration, target, property, propertyKeyframes[property], frame);
-                        propertyKeyframes[property].sort(function (a, b) {
-                            return a.startTime > b.startTime;
-                        });
-                    }
-                    propertyKeyframes[property][0].startTime = 0;
-                    // If we have multiple keyframes, we set the start time and start value
-                    // of future keyframes to be the endTime and endValue of previous keyframes
-                    for (let i = 1; i < propertyKeyframes[property].length; i++) {
-                        propertyKeyframes[property][i].startTime = propertyKeyframes[property][i - 1].endTime;
-                        propertyKeyframes[property][i].startValue = propertyKeyframes[property][i - 1].endValue;
-                    }
-                    let length = propertyKeyframes[property].length;
-                    // Set the isLast value for the property keyframes
-                    propertyKeyframes[property][length - 1].isLast = true;
-                }
-                else if (is.obj(animateObj[property])) {
-                    propertyKeyframes[property] = [];
-                    let frame = animateObj[property];
-                    let isLast = true;
-                    addKeyframe(duration, target, property, propertyKeyframes[property], frame, isLast);
-                }
-                else {
-                    propertyKeyframes[property] = [];
-                    let value = animateObj[property];
-                    let frame = {'100%' : value};
-                    let isLast = true;
-                    addKeyframe(duration, target, property, propertyKeyframes[property], frame, isLast);
-                }
-            }
-        }
-        function addKeyframe(duration, target, property, keyframes, frame, isLast) {
-            let percentComplete = getFirstKey(frame),
-                endTime = (parsePercentage(percentComplete) / 100) * duration,
-                startVal = parseValue(getTargetValue(target, property), property);
-            keyframes.push({
-                startTime : 0,
-                startValue : startVal,
-                endTime : endTime,
-                endValue : parseValue(frame[percentComplete]),
-                unit : parseUnit(target, property, frame[percentComplete]),
-                isLast : isLast
-            });
-        }
-        function getKeyframes(animateObj, duration, target) {
-            let propertyKeyframes = {};
-            for (let property in animateObj) {
-                if (!livelyProperties.includes(property)) {
-                    parseKeyframes(duration, target, animateObj, property, propertyKeyframes);
-                }
-            }
-            return propertyKeyframes;
         }
         factory.createAnimation = (animateObj, durationMs) => {
             return {
@@ -355,7 +344,7 @@
                     if (cssTransformProperties.includes(property)) transform[property] = currentVal;
                     else setTargetPropertyValue(target, property, currentVal);
                 }
-                if (transform !== {}) {
+                if (!is.empty(transform)) {
                     setTargetPropertyValue(target, 'transform', transform);
                 }
             }
@@ -491,7 +480,6 @@
     lively.animate = (animateObj, durationMs) => {
         let animation = animationFactory.createAnimation(animateObj, durationMs);
         queuedAnimations.push(animation);
-        return queuedAnimations.length - 1;
     };
     lively.play = animationEngine.play;
     lively.rewind = animationEngine.rewind;
