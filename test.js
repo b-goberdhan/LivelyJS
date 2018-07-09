@@ -29,8 +29,8 @@ window.onload = function () {
         scaleX : [{ '20%' : .5 }, { '90.5%' : 2}, {'100%' : 1}],
         scaleY : [{ '50%' : .5 }, { '95%' : 2}, {'100%' : 1}],
         //translateY : [{'10%' : 40 }, { '25%' : -40 }, { '100%' : 40 }],
-        //'opacity' : [{ '25%' : 0.1}, { '50%' : 1}, { '75%' : .5}, {'100%' : 1}],
-        //'background-color':  [{ '20%' : '#2345ff'}, { '50%' : '#22ff3c'}, { '100%' : '#ffcf21' }],
+        'opacity' : [{ '25%' : 0.1}, { '50%' : 1}, { '75%' : .5}, {'100%' : 1}],
+        'background-color':  [{ '20%' : '#2345ff'}, { '50%' : '#22ff3c'}, { '100%' : '#ffcf21' }],
         //'font-size' : [{ '10%' : '50px' }],
         //'background-color' : '#000',
         //'color' : '#852234',
@@ -45,16 +45,10 @@ window.onload = function () {
     }, 5000);
     document.getElementById('mydiv1').onclick = function() {
 
-        lively.play();
-        setTimeout(function () {
-            lively.rewind();
-        }, 2000);
-        setTimeout(function () {
-           lively.pause();
-        }, 3000);
-        setTimeout(function () {
-            lively.play();
-        }, 4000);
+        //lively.play();
+        lively.promise.play().then((resolve) => {
+           console.log('done!!');
+        });
     };
 };
 

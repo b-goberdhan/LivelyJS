@@ -356,10 +356,12 @@
     })();
 
     let queuedAnimations = [];
+    let runningAnimations = [];
     let finishedAnimations = [];
     let raf = 0;
     let lively = {};
     let config = {};
+
     lively.configure = (options) => {
         config.onRenderTick = options.onRenderTick;
         config.preserveAll = options.preserveAll;
@@ -373,24 +375,31 @@
         let elapsedTime = 0;
         let pauseTime = 0;
         let reverseTime = 0;
-        let isPaused = false; 
-        let isStopped = false;
+        let isPaused = false;
         let isRewinding = false;
-        function play() {
-            isRewinding = isPaused = isStopped = false;
-            raf = requestAnimationFrame(tick);
+        let isPlaying = false;
+        let resolve;
+        function play(res) {
+            isRewinding = isPaused = false;
+            resolve = res;
+            runningAnimations = runningAnimations.concat(queuedAnimations);
+            if (!isPlaying) {
+                isPlaying = true;
+                raf = requestAnimationFrame(tick);
+            }
         }
         function rewind() {
-            if (!isStopped) {
+            if (isPlaying) {
                 isRewinding = true;
             }
         }
         function pause() {
             isPaused = true;
             isRewinding = false;
+            isPlaying = false;
         }
         function stop() {
-            isStopped = true;
+            isPlaying = false;
             isRewinding = false;
             startTime = undefined;
             elapsedTime = 0;
@@ -401,35 +410,41 @@
                 queuedAnimations = [].concat(finishedAnimations);
                 finishedAnimations = [];
             }
+            runningAnimations = [];
+            if (resolve) {
+                resolve();
+            }
         }
         function reset() {
             startTime = undefined;
             elapsedTime = undefined;
             isPaused = false;
+            isPlaying = false;
+            resolve = undefined;
             raf = 0;
         }
         function renderAnimations(elapsedTime) {
-            for (let i = 0; i < queuedAnimations.length; i++) {
-                if (queuedAnimations[i]) {
-                    let finished = renderer(elapsedTime, queuedAnimations[i]);
-                    if (queuedAnimations[i].onUpdate && !isPaused) {
-                        queuedAnimations[i].onUpdate(queuedAnimations[i].target);
+            for (let i = 0; i < runningAnimations.length; i++) {
+                if (runningAnimations[i]) {
+                    let finished = renderer(elapsedTime, runningAnimations[i]);
+                    if (runningAnimations[i].onUpdate && !isPaused) {
+                        runningAnimations[i].onUpdate(runningAnimations[i].target);
                     }
                     
                     if (finished) {
-                        if (queuedAnimations[i].onDone) {
-                            queuedAnimations[i].onDone(queuedAnimations[i].target);
+                        if (runningAnimations[i].onDone) {
+                            runningAnimations[i].onDone(runningAnimations[i].target);
                         }
-                        if (queuedAnimations[i].preserve) {
-                            finishedAnimations.push(queuedAnimations[i]);
+                        if (runningAnimations[i].preserve) {
+                            finishedAnimations.push(runningAnimations[i]);
                         }
-                        queuedAnimations.splice(i, 1);
+                        runningAnimations.splice(i, 1);
                     }
                 }
             }
         }
         function tick(timeStamp) {
-            if (queuedAnimations.length && !isStopped) {
+            if (runningAnimations.length && isPlaying) {
                 if (!startTime) {
                     startTime = timeStamp;
                 }
@@ -473,6 +488,7 @@
 
     lively.reset = () => {
         queuedAnimations = [];
+        runningAnimations = [];
         finishedAnimations = [];
         animationEngine.reset();
     };
@@ -481,10 +497,23 @@
         let animation = animationFactory.createAnimation(animateObj, durationMs);
         queuedAnimations.push(animation);
     };
-    lively.play = animationEngine.play;
-    lively.rewind = animationEngine.rewind;
-    lively.pause = animationEngine.pause;
-    lively.stop = animationEngine.stop;
+
+    lively.promise = {};
+    lively.promise.play = () => {
+        return new Promise((resolve, reject) => {
+            try {
+                animationEngine.play(resolve);
+            }
+            catch (e) {
+                reject(e);
+            }
+        });
+    };
+
+    lively.play = () => animationEngine.play();
+    lively.rewind = () => animationEngine.rewind();
+    lively.pause = () => animationEngine.pause();
+    lively.stop = () => animationEngine.stop();
 
     return lively;
 }));
