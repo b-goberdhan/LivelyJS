@@ -20,60 +20,62 @@
     };
     let customEasings = {};
 
-    // NEW CSS STUFF
-    const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve'];
-    const cssTransformProperties = ['translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
-    const cssProperties = ['opacity', 'width', 'height', 'left', 'top', 'right', 'bottom', 'border-radius'];
+    function stringContains(string, text) {
+        return string.indexOf(text) > -1;
+    }
+    //Helpers
+    const is = {
+        dom: a => a instanceof Element,
+        svg: a => a instanceof SVGElement,
+        obj: a => stringContains(Object.prototype.toString.call(a), 'Object'),
+        empty: a => Object.keys(a).length === 0 || (is.array(a) && a.length === 0),
+        array: a => Array.isArray(a),
+        nodeList : a => stringContains(Object.prototype.toString.call(a), 'NodeList'),
+        str: a => typeof a === 'string',
+        und: a => a === undefined,
+        fnc: a => typeof a === 'function',
+        rgb: a => /^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.test(a),
+        hex: a => /(^#[0-9a-f]{3}$)|(^#[0-9a-f]{6}$)/i.test(a),
+        hex3: a => /(^#[0-9a-f]{3}$)/i.test(a),
+        hex6: a => /(^#[0-9a-f]{6}$)/i.test(a),
+        col : a => is.rgb(a) || is.hex(a)
+    };
+
+    function getFirstKey(obj) {
+        for (let key in obj) { return key; }
+    }
+    const livelyProperties = ['update', 'done', 'targets', 'eases', 'preserve', 'keyframes'];
+    const cssTransformProperties = ['transform', 'translateX', 'translateY', 'rotate', 'scaleX', 'scaleY', 'skewX', 'skewY'];
     const cssColorProperties = ['color', 'background-color', 'border-color', 'fill'];
-    function isElement(object) {
-        return (object instanceof Element);
+
+    function parseValue(value, property) {
+        if (is.col(value)) return parseColor(value);
+        let result = parseTransform(value, property);
+        if (!is.und(result) && !isNaN(result)) return result;
+        result = parseFloat(parseCssValue(value));
+        if (!is.und(result) && !isNaN(result)) return result;
+        return value;
     }
-    function isObject(object) {
-        return (object instanceof Object);
+    function parseCssValue(value) {
+        if (!is.str(value)) return undefined;
+        return value.replace(/[^0-9]/g, '');
     }
-    function setCssValue(element, property, value) {
-        if (isElement(element)) {
-            element.style[property] = value;
+    function parseTransform(value, property) {
+        if (!property || !cssTransformProperties.includes(property)) return undefined;
+        let currentTransform = {};
+        let match;
+        let regex = /(\w+)\(([^)]*)\)/g;
+        while ((match = regex.exec(value)) !== null) {
+            let number = match[2].replace(/[^0-9]/g, '');
+            if (number) currentTransform[match[1]] = parseFloat(number);
         }
-    }
-    function getCssValue(element, property) {
-        if (isElement(element)) {
-            return getComputedStyle(element).getPropertyValue(property);
-        }
-    }
-    function setCssTransform(element, matrix) {
-        if (isElement(element) && matrix) {
-            let matrixString = 'matrix(' + matrix.scaleX + ', ' + matrix.skewX + ', ' + matrix.skewY + ', ' + matrix.scaleY + ', ' + matrix.translateX + ', ' + matrix.translateY + ')';
-            let rotateString = 'rotate(' + (matrix.rotate || 0) + 'deg)';
-            element.style.transform = matrixString + ' ' + rotateString;
-        }
-    }
-    function getCssTransform(element) {
-        if (isElement(element)) {
-            let matrixString = getCssValue(element, 'transform');
-            let matrixValues = [1,0,0,1,0,0];
-            if (matrixString !== 'none') matrixValues = matrixString.match(/\(([^()])+\)/)[0].match(/[^()]+/)[0].split(',');
-            return {
-                scaleX : parseFloat(matrixValues[0]),
-                skewY : parseFloat(matrixValues[1]),
-                skewX : parseFloat(matrixValues[2]),
-                scaleY : parseFloat(matrixValues[3]),
-                translateX : parseFloat(matrixValues[4]),
-                translateY : parseFloat(matrixValues[5]),
-                rotate : Math.round(Math.atan2(parseFloat(matrixValues[1]), parseFloat(matrixValues[0])) * 180/Math.PI)
-            };
-        }
-    }
-    function getCssUnit(element, property) {
-        if (isElement(element)) {
-            let styleValue = getComputedStyle(element).getPropertyValue(property);
-            if (styleValue.endsWith('px')) return 'px';
-            if (styleValue.endsWith('%')) return '%';
-            else return '';
-        }
+
+        if (!currentTransform[property] && stringContains(property, 'scale')) return 1;
+        else if (!currentTransform[property]) return 0;
+        else return currentTransform[property];
     }
     function parseColor(color) {
-        if (color.startsWith('rgb(')) {
+        if (is.rgb(color)) {
             let rgb = color.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
             if (rgb) {
                 return {
@@ -83,7 +85,7 @@
                 };
             }
         }
-        else if (color.startsWith('#') && color.length === 4) {
+        else if (is.hex3(color)) {
             let rgb = color.match(/^#([0-9a-f]{3})$/i)[1];
             if (rgb) {
                 return {
@@ -93,7 +95,7 @@
                 };
             }
         }
-        else if (color.startsWith('#') && color.length === 7) {
+        else if (is.hex6(color)) {
             let rgb = color.match(/^#([0-9a-f]{6})$/i)[1];
             if (rgb) {
                 return {
@@ -104,113 +106,91 @@
             }
         }
     }
-    function getRgbValue(element, property) {
-        if (isElement(element) && cssColorProperties.includes(property)) {
-            let colorString = getCssValue(element, property);
-            return parseColor(colorString);
+
+    function parsePercentage(str) {
+        if (str.endsWith('%')) return parseFloat(str.replace('%', ''));
+    }
+    function parseUnit(target, property, value) {
+        if (!is.dom(target)) return undefined;
+        return parseCssUnit(target, property, value);
+    }
+    function parseCssUnit(element, property, value) {
+        if (is.dom(element) && cssColorProperties.includes(property)) return undefined;
+        else if (is.dom(element)) {
+            if (stringContains(property, 'opacity') || stringContains(property, 'scale')) return undefined;
+            let unit = /(%|em|ex|ch|rem|vw|vh|vmin|vmax|cm|mm|in|px|pt|pc|deg)$/.exec(value);
+            if (!unit && stringContains(property, 'rotate') || stringContains(property, 'skew')) return 'deg';
+            if (!unit) return 'px';
+            return unit[0];
+        }
+    }
+    function getTargetValue(target, property) {
+        if (is.dom(target)) {
+            return getCssValue(target, property);
+        }
+        return target[property];
+    }
+    function getCssValue(element, property) {
+        if (is.dom(element) && cssTransformProperties.includes(property)) {
+            return element.style.transform;
+        }
+        else if (is.dom(element)) {
+            return getComputedStyle(element).getPropertyValue(property);
+        }
+    }
+    function setTargetPropertyValue(target, property, value) {
+        if (is.dom(target) && cssTransformProperties.includes(property)) {
+            setTransformValue(target, property, value);
+        }
+        else if (is.dom(target) && cssColorProperties.includes(property)) {
+            setRgbValue(target, property, value);
+        }
+        else if (is.dom(target)) {
+            target.style[property] = value;
+        }
+        else if (is.obj(target)) {
+            target[property] = value;
         }
     }
     function setRgbValue(element, property, rgb) {
-        if (isElement(element)) {
+        if (is.dom(element)) {
             element.style[property] = 'rgb(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ')';
+        }
+    }
+    function setTransformValue(element, property, transform) {
+        
+        if (is.dom(element)) {
+
+            let scaleX = !transform.scaleX ? '' : 'scaleX('+ transform.scaleX +') ';
+            let skewY = !transform.skewY ? '' : 'skewY('+ transform.skewY +') ';
+            let skewX = !transform.skewX ? '' : 'skewX('+ transform.skewX +') ';
+            let scaleY = !transform.scaleY ? '' : 'scaleY('+ transform.scaleY +') ';
+            let translateX = !transform.translateX ? '' : 'translateX('+ transform.translateX +') ';
+            let translateY = !transform.translateY ? '' : 'translateY('+ transform.translateY +') ';
+            let rotate = !transform.rotate ? '' : 'rotate('+ transform.rotate +') ';
+            element.style.transform = translateX + translateY + scaleX + scaleY + rotate + skewY + skewX;
         }
     }
     // Animation related constants
     const animationFactory = (() => {
         let factory = {};
-        function createAnimatable(target, desiredProperties) {
-            let startProperties = {};
-            for (let property in desiredProperties) {
-                if (isElement(target) && property === 'transform') {
-                    startProperties[property] = getCssTransform(target);
-                }
-                else if (isElement(target) && cssColorProperties.includes(property)) {
-                    startProperties[property] = getRgbValue(target, property);
-                }
-                else if (isElement(target) && cssProperties.includes(property)) {
-                    let cssValue = getCssValue(target, property);
-                    let unit = getCssUnit(target,property);
-                    if (unit !== '') startProperties[property] = parseFloat(cssValue.substring(0, cssValue.indexOf(unit)));
-                    else startProperties[property] = parseFloat(cssValue);
-                }
-                else {
-                    startProperties[property] = target[property];
-                }
-
-            }
-            if (desiredProperties.transform) {
-                desiredProperties.transform = {
-                    scaleX : !desiredProperties.transform.scaleX ? startProperties.transform.scaleX : desiredProperties.transform.scaleX,
-                    skewY : !desiredProperties.transform.skewY ? startProperties.transform.skewY : desiredProperties.transform.skewY,
-                    skewX : !desiredProperties.transform.skewX ? startProperties.transform.skewX : desiredProperties.transform.skewX,
-                    scaleY : !desiredProperties.transform.scaleY ? startProperties.transform.scaleY : desiredProperties.transform.scaleY,
-                    translateX : !desiredProperties.transform.translateX ? startProperties.transform.translateX : desiredProperties.transform.translateX,
-                    translateY : !desiredProperties.transform.translateY ? startProperties.transform.translateY : desiredProperties.transform.translateY,
-                    rotate : desiredProperties.transform.rotate || 0
-                };
-            }
-            return {
-                target : target,
-                startProperties: startProperties,
-                desiredProperties: desiredProperties
-            };
-        }
-        function getAnimatables(targets, properties) {
-            let animatedTargets = [];
-            if (typeof targets === 'string') {
-                let createdTargets = document.querySelectorAll(targets);
-                for (let i = 0; i < createdTargets.length; i++) {
-                    animatedTargets.push(createAnimatable(createdTargets[i], properties));
-                }
-            }
-            else if (targets.length) {
-                for (let i = 0; i < targets.length; i++) {
-                    animatedTargets.push(createAnimatable(target[i], properties));
-                }
-            }
-            else if (targets) {
-                animatedTargets.push(createAnimatable(targets, properties));
-            }
-            return animatedTargets;
-        }
-        function getProperties(animatable) {
-            let desiredPropertyValues = {};
-            for (let property in animatable) {
-                if (!livelyProperties.includes(property)) {
-                    if (cssTransformProperties.includes(property)) {
-                        if (!desiredPropertyValues.transform) {
-                            desiredPropertyValues.transform = { };
-                        }
-                        desiredPropertyValues.transform[property] = animatable[property];
-                    }
-                    else if (cssColorProperties.includes(property)) {
-                        desiredPropertyValues[property] = parseColor(animatable[property]);
-                    }
-                    else {
-                        desiredPropertyValues[property] = animatable[property];  
-                    }
-                    
-                }
-            }
-            return desiredPropertyValues;
-        }
         function getEases(eases) {
             let animationEases = {
                 'default' : easings.default
             };
-            if (typeof eases === 'function') {
+            if (is.fnc(eases)) {
                 animationEases.default = eases;
             }
-            else if (typeof eases === 'string' && (eases in easings)) {
+            else if (is.str(eases) && (eases in easings)) {
                 animationEases.default = easings[eases];
             }
-            else if (typeof eases === 'string' && (eases in customEasings)) {
+            else if (is.str(eases) && (eases in customEasings)) {
                 animationEases.default = customEasings[eases];
             }
-            else if (eases && eases.length) {
+            else if (is.array(eases)) {
                 for (let i = 0; i < eases.length; i++) {
                     for (let property in eases[i]) {
-                        if ((typeof eases[i][property] === 'string') && (eases[i][property] in easings) || (eases[i][property] in customEasings)) {
+                        if (is.str(eases[i][property]) && (eases[i][property] in easings) || (eases[i][property] in customEasings)) {
                             let easingName = eases[i][property];
                             animationEases[property] = easings[easingName] || customEasings[easingName];
                         }
@@ -220,11 +200,96 @@
             }
             return animationEases;
         }
+        function getKeyframes(animatedProperties, duration, target) {
+            let propertyKeyframes = {};
+            for (let propertyName in animatedProperties) {
+                let keyframes = [];
+                let animatedProperty = animatedProperties[propertyName];
+
+                if (!is.obj(animatedProperty) && !is.array(animatedProperty) && !is.nodeList(animatedProperty)) {
+                    keyframes.push({
+                        startTime : 0,
+                        startValue : parseValue(getTargetValue(target, propertyName), propertyName),
+                        endTime : duration,
+                        endValue : parseValue(animatedProperty),
+                        unit : parseUnit(target, propertyName, animatedProperty),
+                        isLast : true
+                    });
+                }
+                else {
+                    if (is.obj(animatedProperty)) {
+                        animatedProperty = [].concat(animatedProperty);
+                    }
+                    for (let i = 0; i < animatedProperty.length; i++) {
+
+                        let key = getFirstKey(animatedProperty[i]);
+                        let endTime = (parsePercentage(key) / 100) * duration;
+                        keyframes.push({
+                            startTime : 0,
+                            startValue : parseValue(getTargetValue(target, propertyName), propertyName),
+                            endTime : endTime,
+                            endValue : parseValue(animatedProperty[i][key]),
+                            unit : parseUnit(target, propertyName, animatedProperty[i][key]),
+                            isLast : false
+                        });
+                    }
+                    keyframes.sort((a, b) => {
+                        return a.startTime > b.startTime;
+                    });
+                    keyframes[keyframes.length - 1].isLast = true;
+
+                    for (let i = 1; i < keyframes.length; i++) {
+                        keyframes[i].startTime = keyframes[i - 1].endTime;
+                        keyframes[i].startValue = keyframes[i - 1].endValue;
+                    }
+
+                }
+                propertyKeyframes[propertyName] = keyframes;
+
+            }
+            return propertyKeyframes;
+        }
+        function getTargets(animateObj, duration){
+            let targets = animateObj.targets;
+            let animatedTargets = [];
+            let animatedProperties = {};
+
+            for (let property in animateObj) {
+                if (!livelyProperties.includes(property)) {
+                    animatedProperties[property] = animateObj[property];
+                }
+            }
+
+            if (is.str(targets)) {
+                let createdTargets = document.querySelectorAll(targets);
+                for (let i = 0; i < createdTargets.length; i++) {
+                    animatedTargets.push({
+                        target : createdTargets[i],
+                        keyframes : getKeyframes(animatedProperties, duration, createdTargets[i])
+                    });
+                }
+            }
+            else if (is.array(targets) || is.nodeList(targets)) {
+                for (let i = 0; i < targets.length; i++) {
+                    animatedTargets.push({
+                        target : targets[i],
+                        keyframes: getKeyframes(animatedProperties, duration, targets[i])
+                    });
+                }
+            }
+            else if (is.obj(targets)) {
+                animatedTargets.push({
+                    target : targets,
+                    keyframes : getKeyframes(animatedProperties, duration, targets)
+                });
+            }
+            return animatedTargets;
+        }
         factory.createAnimation = (animateObj, durationMs) => {
             return {
                 duration : durationMs,
-                animatables : getAnimatables(animateObj.targets, getProperties(animateObj)),
                 eases : getEases(animateObj.eases),
+                targets : getTargets(animateObj, durationMs),
                 preserve : animateObj.preserve,
                 onDone : animateObj.done,
                 onUpdate : animateObj.update
@@ -233,82 +298,54 @@
         return factory;
     })();
     const animator = (() => {
-        function tickCssTransform(currentTime, duration, animatable, eases) {
-            let target = animatable.target;
-            let desiredTransforms = animatable.desiredProperties.transform;
-            let startingProperties = animatable.startProperties.transform;
-            let currentMatrix = {};
-
-            for (let property in desiredTransforms) {
-                let tweenName = (eases[property]) ? property : 'default';
-                let tween = eases[tweenName];
-
-                let startVal = startingProperties[property];
-                let changeInVal = desiredTransforms[property] - startVal;
-                if (currentTime >= duration) currentMatrix[property] = desiredTransforms[property];
-                else currentMatrix[property] = tween(currentTime, startVal, changeInVal, duration);
+        function getTween(eases, property) {
+            return (eases[property] ? eases[property] : eases['default']);
+        }
+        function getKeyframe(currentTime, propertyKeyframes) {
+            let length = propertyKeyframes.length;
+            let keyframe = propertyKeyframes.filter(function (keyframe) {
+                return currentTime >= keyframe.startTime && currentTime <= keyframe.endTime;
+            })[0];
+            if (keyframe) return keyframe;
+            else return propertyKeyframes[length - 1];
+        }
+        function animateKeyframe(currentTime, target, property, keyframe, tween) {
+            if (keyframe.isLast && currentTime >= keyframe.endTime) {
+                return keyframe.endValue;
+            }
+            else if (is.dom(target) && cssColorProperties.includes(property)) {
+                return {
+                    r : tween((currentTime - keyframe.startTime), keyframe.startValue.r, (keyframe.endValue.r - keyframe.startValue.r), (keyframe.endTime - keyframe.startTime)),
+                    g : tween((currentTime - keyframe.startTime), keyframe.startValue.g, (keyframe.endValue.g - keyframe.startValue.g), (keyframe.endTime - keyframe.startTime)),
+                    b : tween((currentTime - keyframe.startTime), keyframe.startValue.b, (keyframe.endValue.b - keyframe.startValue.b), (keyframe.endTime - keyframe.startTime)),
+                };
+            }
+            else if (is.dom(target) || is.obj(target)) {
+                return tween((currentTime - keyframe.startTime), keyframe.startValue, (keyframe.endValue - keyframe.startValue), (keyframe.endTime - keyframe.startTime));
             }
 
-            setCssTransform(target, currentMatrix);
-        }
-        function tickCssColor(currentTime, duration, animatable, property, eases) {
-            let tweenName = (eases[property]) ? property : 'default';
-            let tween = eases[tweenName];
-            let target = animatable.target;
-            let startColors = animatable.startProperties[property];
-            let desiredColors = animatable.desiredProperties[property];
-            let currentValue = {};
-            for (let color in desiredColors) {
-                let startColor = startColors[color];
-                let changeInVal = desiredColors[color] - startColor;
-                if (currentTime >= duration) currentValue[property] = desiredColors[color];
-                else currentValue[color] = tween(currentTime, startColor, changeInVal, duration);
-            }
-            setRgbValue(target, property, currentValue);
-        }
-        function tickCssStyle(currentTime, duration, animatable, property, eases) {
-            let tweenName = (eases[property]) ? property : 'default';
-            let tween = eases[tweenName];
-            let unit = getCssUnit(animatable.target, property);
-            let startValue = parseFloat(animatable.startProperties[property]);
-            let currentValue;
-            let desiredValue = animatable.desiredProperties[property];
-            if (currentTime >= duration) currentValue = desiredValue;
-            else currentValue = tween(currentTime, startValue, (desiredValue - startValue), duration);
-            setCssValue(animatable.target, property, currentValue + unit);
-        }
-        function tickObject(currentTime, duration, animatable, property, eases) {
-            let tweenName = (eases[property]) ? property : 'default';
-            let tween = eases[tweenName];
-            let target = animatable.target;
-            let startValue = animatable.startProperties[property];
-            let currentValue;
-            let desiredValue = animatable.desiredProperties[property];
-            if (currentTime >= duration) currentValue = desiredValue;
-            else currentValue = tween(currentTime, startValue, (desiredValue - startValue), duration);
-            target[property] = currentValue;
         }
         function tick(currentTime, animation) {
-            let duration = animation.duration;
-            let finished = (currentTime >= duration);
-            // Iterate through all animatables
-            for (let i = 0; i < animation.animatables.length; i++) {
-                let animatable = animation.animatables[i];
-                let desiredProperties = animatable.desiredProperties;
-                // Iterate through all properties to be animated in the animatable
-                for (let property in desiredProperties) {
-                    if (isElement(animatable.target) && property === 'transform') {
-                        tickCssTransform(currentTime, duration, animatable, animation.eases);
-                    }
-                    else if (isElement(animatable.target) && cssColorProperties.includes(property)) {
-                        tickCssColor(currentTime, duration, animatable, property, animation.eases);
-                    }
-                    else if (isElement(animatable.target)) {
-                        tickCssStyle(currentTime, duration, animatable, property, animation.eases);
-                    }
-                    else if (isObject(animatable.target)) {
-                        tickObject(currentTime, duration, animatable, property, animation.eases);
-                    }
+            const duration = animation.duration;
+            const finished = (currentTime >= duration) || (currentTime < 0);
+            if (currentTime < 0) return finished;
+
+            let eases = animation.eases;
+            for (let i = 0; i < animation.targets.length; i++) {
+                let target = animation.targets[i].target;
+                let keyframeProperties = animation.targets[i].keyframes;
+
+                let transform = {};
+                for (let property in keyframeProperties) {
+                    let tween = getTween(eases, property);
+                    let keyframe = getKeyframe(currentTime, keyframeProperties[property]);
+                    let currentVal = animateKeyframe(currentTime, target, property, keyframe, tween);
+                    if (keyframe.unit) currentVal = currentVal + keyframe.unit;
+                    if (cssTransformProperties.includes(property)) transform[property] = currentVal;
+                    else setTargetPropertyValue(target, property, currentVal);
+                }
+                if (!is.empty(transform)) {
+                    setTargetPropertyValue(target, 'transform', transform);
                 }
             }
             return finished;
@@ -319,10 +356,12 @@
     })();
 
     let queuedAnimations = [];
+    let runningAnimations = [];
     let finishedAnimations = [];
     let raf = 0;
     let lively = {};
     let config = {};
+
     lively.configure = (options) => {
         config.onRenderTick = options.onRenderTick;
         config.preserveAll = options.preserveAll;
@@ -335,65 +374,96 @@
         let startTime = 0;
         let elapsedTime = 0;
         let pauseTime = 0;
-        let isPaused = false; 
-        let isStopped = false;
-
-        function play() {
-            isPaused = isStopped = false;
-            raf = requestAnimationFrame(tick);
+        let reverseTime = 0;
+        let isPaused = false;
+        let isRewinding = false;
+        let isPlaying = false;
+        let resolve;
+        function play(res) {
+            isRewinding = isPaused = false;
+            resolve = res;
+            runningAnimations = runningAnimations.concat(queuedAnimations);
+            if (!isPlaying) {
+                isPlaying = true;
+                raf = requestAnimationFrame(tick);
+            }
+        }
+        function rewind() {
+            if (isPlaying) {
+                isRewinding = true;
+            }
         }
         function pause() {
             isPaused = true;
+            isRewinding = false;
+            isPlaying = false;
         }
         function stop() {
-            isStopped = true;
+            isPlaying = false;
+            isRewinding = false;
             startTime = undefined;
             elapsedTime = 0;
             pauseTime = 0;
+            reverseTime = 0;
+            raf = 0;
             if (finishedAnimations.length) {
                 queuedAnimations = [].concat(finishedAnimations);
                 finishedAnimations = [];
+            }
+            runningAnimations = [];
+            if (resolve) {
+                resolve();
             }
         }
         function reset() {
             startTime = undefined;
             elapsedTime = undefined;
             isPaused = false;
+            isPlaying = false;
+            resolve = undefined;
+            raf = 0;
         }
         function renderAnimations(elapsedTime) {
-            for (let i = 0; i < queuedAnimations.length; i++) {
-                if (queuedAnimations[i]) {
-                    let finished = renderer(elapsedTime, queuedAnimations[i]);
-                    if (queuedAnimations[i].onUpdate && !isPaused) {
-                        queuedAnimations[i].onUpdate(queuedAnimations[i].target);
+            for (let i = 0; i < runningAnimations.length; i++) {
+                if (runningAnimations[i]) {
+                    let finished = renderer(elapsedTime, runningAnimations[i]);
+                    if (runningAnimations[i].onUpdate && !isPaused) {
+                        runningAnimations[i].onUpdate(runningAnimations[i].target);
                     }
                     
                     if (finished) {
-                        if (queuedAnimations[i].onDone) {
-                            queuedAnimations[i].onDone(queuedAnimations[i].target);
+                        if (runningAnimations[i].onDone) {
+                            runningAnimations[i].onDone(runningAnimations[i].target);
                         }
-                        if (queuedAnimations[i].preserve) {
-                            finishedAnimations.push(queuedAnimations[i]);
+                        if (runningAnimations[i].preserve) {
+                            finishedAnimations.push(runningAnimations[i]);
                         }
-                        queuedAnimations.splice(i, 1);
+                        runningAnimations.splice(i, 1);
                     }
                 }
             }
         }
         function tick(timeStamp) {
-            if (queuedAnimations.length && !isStopped) {
+            if (runningAnimations.length && isPlaying) {
                 if (!startTime) {
                     startTime = timeStamp;
                 }
-                
+
                 if (isPaused) {
                     pauseTime = (timeStamp - startTime) - elapsedTime;
                     elapsedTime = (timeStamp - startTime) - pauseTime; 
                 }
-                else {
-                    elapsedTime = (timeStamp - startTime) - pauseTime; 
+
+                if (isRewinding) {
+                    let currentTime = (timeStamp - startTime) - pauseTime;
+                    reverseTime = (elapsedTime - (currentTime - elapsedTime));
+                    renderAnimations(reverseTime);
                 }
-                renderAnimations(elapsedTime);
+                else {
+                    elapsedTime = (timeStamp - startTime) - pauseTime;
+                    renderAnimations(elapsedTime - reverseTime);
+                }
+
                 if (config.onRenderTick) {
                     config.onRenderTick();
                 }
@@ -409,6 +479,7 @@
         }
         return {
             play : play,
+            rewind : rewind,
             pause : pause,
             stop : stop,
             reset : reset
@@ -417,6 +488,7 @@
 
     lively.reset = () => {
         queuedAnimations = [];
+        runningAnimations = [];
         finishedAnimations = [];
         animationEngine.reset();
     };
@@ -424,11 +496,24 @@
     lively.animate = (animateObj, durationMs) => {
         let animation = animationFactory.createAnimation(animateObj, durationMs);
         queuedAnimations.push(animation);
-        return queuedAnimations.length - 1;
     };
-    lively.play = animationEngine.play;
-    lively.pause = animationEngine.pause;
-    lively.stop = animationEngine.stop;
+
+    lively.promise = {};
+    lively.promise.play = () => {
+        return new Promise((resolve, reject) => {
+            try {
+                animationEngine.play(resolve);
+            }
+            catch (e) {
+                reject(e);
+            }
+        });
+    };
+
+    lively.play = () => animationEngine.play();
+    lively.rewind = () => animationEngine.rewind();
+    lively.pause = () => animationEngine.pause();
+    lively.stop = () => animationEngine.stop();
 
     return lively;
 }));
