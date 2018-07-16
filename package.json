@@ -2,11 +2,13 @@
   "name": "LivelyJS",
   "version": "0.0.1",
   "dependencies": {
-    "grunt": "^1.0.2"
   },
   "devDependencies": {
-    "grunt-contrib-jshint": "^1.1.0",
-    "grunt-contrib-uglify": "^3.3.0",
-    "grunt-contrib-watch": "^1.1.0"
+    "gulp": "^4.0.0",
+    "gulp-jshint": "^2.1.0",
+    "gulp-uglify": "^3.0.0",
+    "gulp-watch": "^5.0.0",
+    "jshint": "^2.9.5",
+    "uglify-es": "^3.3.9"
   }
 }
