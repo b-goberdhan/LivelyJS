@@ -79,6 +79,10 @@ The percentage will caculate the time based on the total duration of the animati
 That's about it for keyframes, you can still create your animations the other way or you can get a bit more
 creative.
 
+**Promise support**
+So far there is only one promise in livelyjs.
+The promise is for livelyjs.play.
+Usage : livelyjs.promise.play() which returns a promise and finishes when the animation is done playing.
 **Adding animations**: 
 In order to add animations you must call:
 
