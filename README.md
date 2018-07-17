@@ -20,11 +20,18 @@ This library provides a means to easily and seamlessly add animation on to your 
  - Keyframe animation
  - Promise for lively.animate({}).play
  - A lot background changes into how lively functions.
-
+## Coming soon:
+ - Support for rgba color (this is a bug)
+ - Adding unit test to this project
  
 
 ## Installation:
-run the command `bower install livelyjs` 
+**Using bower:**
+`bower install livelyjs` 
+**Using yarn:**
+`yarn add livelyjs`
+**Using npm:**
+`npm install livelyjs`
 ## Usage:
 HTML:
 
@@ -58,6 +65,20 @@ Javascript:
 And voila! You should see an animation where the object moves, scales down and turns into a circle!
 
 ## The basics:
+**NEW Keyframes**
+LivelyJS now supports keyframes, this means you can add more complicated and comprehensive animations.
+Example:
+Take a look at this sample animatated property:
+> 'background-color':  [{ '20%' : '#2345ff'}, { '50.5%' : '#22ff3c'}, { '100%' : '#ffcf21' }]
+
+At 20%, 50.5% and 100% there are desired values for the property.
+
+We use a string representation of a string to set what a target value should be at a given percentage.
+The percentage will caculate the time based on the total duration of the animation.
+
+That's about it for keyframes, you can still create your animations the other way or you can get a bit more
+creative.
+
 **Adding animations**: 
 In order to add animations you must call:
 
