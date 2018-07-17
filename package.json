@@ -1,8 +1,7 @@
 {
-  "name": "LivelyJS",
-  "version": "0.0.1",
-  "dependencies": {
-  },
+  "name": "livelyjs",
+  "version": "2.2.0",
+  "dependencies": {},
   "devDependencies": {
     "gulp": "^4.0.0",
     "gulp-jshint": "^2.1.0",
@@ -10,5 +9,10 @@
     "gulp-watch": "^5.0.0",
     "jshint": "^2.9.5",
     "uglify-es": "^3.3.9"
-  }
+  },
+  "description": "Animation library for javascript",
+  "main": "src/lively.js",
+  "repository": "https://github.com/b-goberdhan/LivelyJS.git",
+  "author": "Brandon G <brandongob@gmail.com>",
+  "license": "MIT"
 }
